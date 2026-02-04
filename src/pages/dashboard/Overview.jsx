@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Box, Typography, Paper, Chip, CircularProgress } from "@mui/material";
+import { Box, Typography, Paper, Chip, CircularProgress, TextField, Button } from "@mui/material";
 
 import PageHeader from "../../components/ui/PageHeader";
 import ChartCard from "../../components/charts/ChartCard";
@@ -16,12 +16,29 @@ import { useAuth } from "../../app/providers/AuthProvider";
 /**
  * Overview.jsx
  * - Aggregated (role-based) summary (NOT selected user scoped)
- * - Layout fills full width (no empty right gaps) using CSS grid auto-fit
- * - No backend/API changes
+ * - Supports From/To date filter (applies to KPIs + all charts)
  */
 
 function num(v) {
   return Number(v || 0).toLocaleString();
+}
+
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+function formatYMDLocal(d) {
+  const yyyy = d.getFullYear();
+  const mm = pad2(d.getMonth() + 1);
+  const dd = pad2(d.getDate());
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function defaultRangeLast7Days() {
+  const to = new Date();
+  const from = new Date();
+  from.setDate(to.getDate() - 6);
+  return { from: formatYMDLocal(from), to: formatYMDLocal(to) };
 }
 
 function KpiCard({ label, value }) {
@@ -55,11 +72,24 @@ export default function Overview() {
   const [dash, setDash] = useState(null);
   const [error, setError] = useState("");
 
+  // Date filter (UI)
+  const initial = useMemo(() => defaultRangeLast7Days(), []);
+  const [fromInput, setFromInput] = useState(initial.from);
+  const [toInput, setToInput] = useState(initial.to);
+
+  // Applied range (used in API call)
+  const [from, setFrom] = useState(initial.from);
+  const [to, setTo] = useState(initial.to);
+
   const scopeParams = useMemo(() => {
     if (role === "C_SUITE") return {};
     if (role === "DEPARTMENT_HEAD" || role === "DEPARTMENT_MEMBER") return { department: me?.department };
     return {};
   }, [role, me?.department]);
+
+  const params = useMemo(() => {
+    return { ...scopeParams, from, to };
+  }, [scopeParams, from, to]);
 
   useEffect(() => {
     let mounted = true;
@@ -68,7 +98,7 @@ export default function Overview() {
       setLoading(true);
       setError("");
       try {
-        const data = await getInsightsDashboard(scopeParams);
+        const data = await getInsightsDashboard(params);
         if (!mounted) return;
         setDash(data || null);
       } catch (e) {
@@ -85,33 +115,72 @@ export default function Overview() {
     return () => {
       mounted = false;
     };
-  }, [scopeParams]);
+  }, [params]);
 
   const k = dash?.kpis || {};
   const c = dash?.charts || {};
+
+  // Backward-compatible KPI keys (in case older backend responses exist)
+  const totalActiveMinutes = k.total_active_minutes ?? k.active_minutes ?? 0;
+  const totalLogs = k.total_logs ?? k.logs ?? 0;
+  const totalScreenshots = k.total_screenshots ?? k.screenshots ?? 0;
+  const totalApps = k.total_apps ?? k.apps ?? 0;
+
+  const headerSubtitle =
+    role === "C_SUITE"
+      ? "Organization-wide summary"
+      : role === "DEPARTMENT_HEAD" || role === "DEPARTMENT_MEMBER"
+      ? `Department summary: ${me?.department || "—"}`
+      : "Summary";
 
   return (
     <Box sx={{ width: "100%", minWidth: 0 }}>
       <PageHeader
         title="Overview"
-        subtitle={
-          role === "C_SUITE"
-            ? "Organization-wide summary"
-            : role === "DEPARTMENT_HEAD" || role === "DEPARTMENT_MEMBER"
-            ? `Department summary: ${me?.department || "—"}`
-            : "Summary"
-        }
+        subtitle={headerSubtitle}
         right={
-          loading ? (
-            <Chip
-              label="Loading"
-              variant="outlined"
-              icon={<CircularProgress size={14} />}
-              sx={{ fontWeight: 900 }}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <TextField
+              size="small"
+              type="date"
+              value={fromInput}
+              onChange={(e) => setFromInput(e.target.value)}
+              sx={{ minWidth: 150 }}
+              inputProps={{ "aria-label": "From date" }}
             />
-          ) : (
-            <Chip label="Live" variant="outlined" sx={{ fontWeight: 900 }} />
-          )
+            <TextField
+              size="small"
+              type="date"
+              value={toInput}
+              onChange={(e) => setToInput(e.target.value)}
+              sx={{ minWidth: 150 }}
+              inputProps={{ "aria-label": "To date" }}
+            />
+            <Button
+              variant="contained"
+              onClick={() => {
+                // Basic guard: only apply when both are present
+                if (fromInput && toInput) {
+                  setFrom(fromInput);
+                  setTo(toInput);
+                }
+              }}
+              sx={{ fontWeight: 900, borderRadius: 999 }}
+            >
+              Apply
+            </Button>
+
+            {loading ? (
+              <Chip
+                label="Loading"
+                variant="outlined"
+                icon={<CircularProgress size={14} />}
+                sx={{ fontWeight: 900 }}
+              />
+            ) : (
+              <Chip label="Live" variant="outlined" sx={{ fontWeight: 900 }} />
+            )}
+          </Box>
         }
       />
 
@@ -140,11 +209,11 @@ export default function Overview() {
               mb: 2,
             }}
           >
-            <KpiCard label="Active Time (min)" value={num(k.total_active_minutes)} />
-            <KpiCard label="Total Logs" value={num(k.logs)} />
-            <KpiCard label="Screenshots" value={num(k.screenshots)} />
-            <KpiCard label="Applications" value={num(k.apps)} />
-            <KpiCard label="Top App" value={k.most_used_app || "—"} />
+            <KpiCard label="Active Time (min)" value={num(totalActiveMinutes)} />
+            <KpiCard label="Total Logs" value={num(totalLogs)} />
+            <KpiCard label="Screenshots" value={num(totalScreenshots)} />
+            <KpiCard label="Applications" value={num(totalApps)} />
+            <KpiCard label="Top App" value={k.most_used_app || k.top_app || "—"} />
             <KpiCard label="Top Category" value={k.top_category || "—"} />
           </Box>
 
