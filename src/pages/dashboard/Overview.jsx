@@ -100,11 +100,28 @@ export default function Overview() {
       try {
         const data = await getInsightsDashboard(params);
         if (!mounted) return;
-        setDash(data || null);
+        setDash(data ? data : { kpis: {}, charts: {} });
       } catch (e) {
         if (!mounted) return;
-        setError(e?.message || "Failed to load overview");
-        setDash(null);
+
+        const msg = (e?.message || "").toLowerCase();
+
+        // If backend says there is no data for the selected range,
+        // show empty charts instead of a scary network error.
+        const isNoData =
+          msg.includes("no data") ||
+          msg.includes("not found") ||
+          msg.includes("empty") ||
+          msg.includes("no logs") ||
+          msg.includes("no records");
+
+        if (isNoData) {
+          setError("");
+          setDash({ kpis: {}, charts: {} });
+        } else {
+          setError(e?.message || "Failed to load overview");
+          setDash(null);
+        }
       } finally {
         if (!mounted) return;
         setLoading(false);
