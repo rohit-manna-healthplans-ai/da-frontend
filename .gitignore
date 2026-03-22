@@ -2,7 +2,6 @@
 # Keep this file for tools that only look inside this folder.
 
 node_modules/
-dist/
 .vite/
 .env
 .env.local
