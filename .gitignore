@@ -1,2 +1,9 @@
+# Root `../.gitignore` applies to the whole repo.
+# Keep this file for tools that only look inside this folder.
+
 node_modules/
-.env.example
+dist/
+.vite/
+.env
+.env.local
+.env.*.local

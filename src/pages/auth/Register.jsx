@@ -21,7 +21,6 @@ import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import { useNavigate } from "react-router-dom";
 
 import { registerApi } from "../../features/auth/auth.api";
-import WavyBackground from "../../components/ui/WavyBackground";
 
 /**
  * Registration is ONLY for:
@@ -106,12 +105,8 @@ export default function Register() {
         px: 2,
       }}
     >
-      <WavyBackground />
-
       {/* Keep everything centered */}
       <Box sx={{ position: "relative", width: "100%", display: "flex", justifyContent: "center" }}>
-        <div className="login-glow" aria-hidden="true" />
-
         <Paper
           className="glass login-card"
           elevation={0}

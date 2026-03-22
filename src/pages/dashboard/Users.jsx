@@ -34,6 +34,7 @@ import PageHeader from "../../components/ui/PageHeader";
 
 import { listUsersApi, createUserApi, updateUserApi } from "../../features/users/users.api";
 import { listDepartmentsApi, createDepartmentApi } from "../../features/departments/departments.api";
+import { normalizeDepartmentList } from "../../utils/departments.jsx";
 
 const ROLE_C_SUITE = "C_SUITE";
 const ROLE_DEPT_HEAD = "DEPARTMENT_HEAD";
@@ -185,7 +186,7 @@ export default function Users() {
     setError("");
     try {
       const [deps, us] = await Promise.all([listDepartmentsApi(), listUsersApi()]);
-      setDepartments(Array.isArray(deps) ? deps : []);
+      setDepartments(normalizeDepartmentList(deps));
       setUsers(Array.isArray(us) ? us : []);
     } catch (e) {
       setError(e?.response?.data?.error || e?.message || "Failed to load users.");
@@ -212,6 +213,12 @@ export default function Users() {
       });
     }
 
+    // Department managers: only users in their department (C-Suite sees all)
+    if (role === ROLE_DEPT_HEAD && me?.department) {
+      const d = String(me.department).trim().toLowerCase();
+      rows = rows.filter((u) => String(u.department || "").trim().toLowerCase() === d);
+    }
+
     // dept filter
     if (deptFilter) {
       rows = rows.filter((u) => String(u.department || "").toLowerCase() === String(deptFilter).toLowerCase());
@@ -234,7 +241,7 @@ export default function Users() {
     }
 
     return rows;
-  }, [users, deptFilter, q, sort, me]);
+  }, [users, deptFilter, q, sort, me, role]);
 
   function openUser(u) {
   const email = u.company_username_norm || u.company_username;
@@ -426,7 +433,9 @@ export default function Users() {
                   <Select value={deptFilter} label="Department" onChange={(e) => setDeptFilter(e.target.value)}>
                     <MenuItem value="">All departments</MenuItem>
                     {departments.map((d) => (
-                      <MenuItem key={d} value={d}>{d}</MenuItem>
+                      <MenuItem key={d.id} value={d.id}>
+                        {d.label}
+                      </MenuItem>
                     ))}
                   </Select>
                 </FormControl>
@@ -518,7 +527,9 @@ export default function Users() {
                 <Select value={form.department} label="Department" onChange={(e) => setForm((s) => ({ ...s, department: e.target.value }))}>
                   <MenuItem value=""><em>None</em></MenuItem>
                   {departments.map((d) => (
-                    <MenuItem key={d} value={d}>{d}</MenuItem>
+                    <MenuItem key={d.id} value={d.id}>
+                      {d.label}
+                    </MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -557,7 +568,9 @@ export default function Users() {
                 <Select value={form.department} label="Department" onChange={(e) => setForm((s) => ({ ...s, department: e.target.value }))}>
                   <MenuItem value=""><em>None</em></MenuItem>
                   {departments.map((d) => (
-                    <MenuItem key={d} value={d}>{d}</MenuItem>
+                    <MenuItem key={d.id} value={d.id}>
+                      {d.label}
+                    </MenuItem>
                   ))}
                 </Select>
               </FormControl>

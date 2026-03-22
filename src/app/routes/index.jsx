@@ -1,22 +1,27 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./ProtectedRoute";
-import UserScopedRoute from "./UserScopedRoute";
 import DashboardLayout from "../layout/index.jsx";
 import { useAuth } from "../providers/AuthProvider";
+import { defaultDashboardPathForRole } from "./dashboardPaths";
 
 import Landing from "../../pages/landing/Landing.jsx";
 import Login from "../../pages/auth/Login.jsx";
 import Register from "../../pages/auth/Register.jsx";
 
-import Overview from "../../pages/dashboard/Overview.jsx";
 import Users from "../../pages/dashboard/Users.jsx";
 import UserDetail from "../../pages/dashboard/UserDetail.jsx";
-import Insights from "../../pages/dashboard/Insights.jsx";
+import MyActivity from "../../pages/dashboard/MyActivity.jsx";
 import Settings from "../../pages/dashboard/Settings.jsx";
-import Claims from "../../pages/dashboard/Claims.jsx";
 import Profile from "../../pages/dashboard/Profile.jsx";
 
+function DashboardHomeRedirect() {
+  const { me, loading } = useAuth();
+  if (loading) return null;
+  if (!me) return <Navigate to="/login" replace />;
+  const path = defaultDashboardPathForRole(me?.role_key || me?.role);
+  return <Navigate to={path} replace />;
+}
 
 function RoleGuard({ allowRoles, children }) {
   const { me, loading } = useAuth();
@@ -27,7 +32,7 @@ function RoleGuard({ allowRoles, children }) {
   if (!me) return <Navigate to="/login" replace />;
 
   if (Array.isArray(allowRoles) && allowRoles.length > 0 && !allowRoles.includes(role)) {
-    return <Navigate to="/dashboard/overview" replace />;
+    return <Navigate to={defaultDashboardPathForRole(role)} replace />;
   }
 
   return children;
@@ -49,18 +54,14 @@ export default function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
 
-      <Route path="/dashboard" element={<Navigate to="/dashboard/overview" replace />} />
-
-      <Route path="/dashboard/overview" element={<DashboardShell><Overview /></DashboardShell>} />
-
-      <Route path="/dashboard/claims" element={<DashboardShell><Claims /></DashboardShell>} />
+      <Route path="/dashboard" element={<DashboardHomeRedirect />} />
 
       <Route
-        path="/dashboard/insights"
+        path="/dashboard/my-activity"
         element={
           <DashboardShell>
-            <RoleGuard allowRoles={["C_SUITE", "DEPARTMENT_HEAD"]}>
-              <UserScopedRoute><Insights /></UserScopedRoute>
+            <RoleGuard allowRoles={["DEPARTMENT_MEMBER"]}>
+              <MyActivity />
             </RoleGuard>
           </DashboardShell>
         }

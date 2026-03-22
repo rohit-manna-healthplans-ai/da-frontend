@@ -9,12 +9,20 @@ function unwrap(res) {
   return res.data.data;
 }
 
+/**
+ * Fetches logs for one device user. Prefer `user_mac_id` (matches DADB users._id).
+ * `company_username` is resolved server-side if mac id is omitted.
+ */
 export async function getLogs(params = {}) {
-  const res = await http.get("/api/logs", { params: withDefaultRange(params) });
+  const res = await http.get("/api/logs", {
+    params: { ...withDefaultRange(params), time_field: "ts" },
+  });
   return unwrap(res); // { items, page, limit, total }
 }
 
 export async function getScreenshots(params = {}) {
-  const res = await http.get("/api/screenshots", { params: withDefaultRange(params) });
+  const res = await http.get("/api/screenshots", {
+    params: { ...withDefaultRange(params), time_field: "ts" },
+  });
   return unwrap(res); // { items, page, limit, total }
 }

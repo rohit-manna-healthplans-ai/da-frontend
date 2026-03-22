@@ -12,7 +12,7 @@ function roleLabel(role) {
   const r = String(role || "").toUpperCase();
   if (r === ROLE_C_SUITE) return "C-Suite (Admin)";
   if (r === ROLE_DEPT_HEAD) return "Department Head (Manager)";
-  if (r === "DEPARTMENT_MEMBER") return "Department Member (No Dashboard Access)";
+  if (r === "DEPARTMENT_MEMBER") return "Department Member";
   return r || "—";
 }
 
@@ -39,50 +39,49 @@ export default function Settings() {
           <Chip size="small" variant="outlined" label={`Email: ${me?.company_username_norm || me?.company_username || "—"}`} />
         </Stack>
 
-        <Divider sx={{ my: 2, borderColor: "rgba(255,255,255,0.10)" }} />
+        <Divider sx={{ my: 2, borderColor: "var(--border-1)" }} />
 
         {isAdmin ? (
           <>
-            <Typography sx={{ fontWeight: 950, fontSize: 16 }}>Admin Controls</Typography>
+            <Typography sx={{ fontWeight: 950, fontSize: 16 }}>Admin</Typography>
             <Typography className="muted" sx={{ mt: 0.5 }}>
-              Admin has full view + update permissions across all departments.
+              Full access to all users, logs, and screenshots. User management from the Users page.
             </Typography>
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1.5 }}>
               <Button variant="contained" onClick={() => nav("/dashboard/users")} sx={{ fontWeight: 950 }}>
-                Manage Users & Departments
-              </Button>
-              <Button variant="outlined" onClick={() => nav("/dashboard/overview")} sx={{ fontWeight: 950 }}>
-                View System Overview
+                Open Users
               </Button>
             </Stack>
           </>
         ) : isManager ? (
           <>
-            <Typography sx={{ fontWeight: 950, fontSize: 16 }}>Manager View</Typography>
+            <Typography sx={{ fontWeight: 950, fontSize: 16 }}>Department manager</Typography>
             <Typography className="muted" sx={{ mt: 0.5 }}>
-              Manager can view and monitor only their department data. No update permissions.
+              You can open only users in your department and view their logs and screenshots.
             </Typography>
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1.5 }}>
               <Button variant="contained" onClick={() => nav("/dashboard/users")} sx={{ fontWeight: 950 }}>
-                View Department Users
-              </Button>
-              <Button variant="outlined" onClick={() => nav("/dashboard/overview")} sx={{ fontWeight: 950 }}>
-                View Department Summary
+                Open department users
               </Button>
             </Stack>
           </>
         ) : (
           <>
-            <Typography sx={{ fontWeight: 950, fontSize: 16 }}>Restricted</Typography>
+            <Typography sx={{ fontWeight: 950, fontSize: 16 }}>Your workspace</Typography>
             <Typography className="muted" sx={{ mt: 0.5 }}>
-              Department members do not have dashboard access (data capture only).
+              You can view only your own logs and screenshots from the sidebar (My logs & screenshots).
             </Typography>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1.5 }}>
+              <Button variant="contained" onClick={() => nav("/dashboard/my-activity")} sx={{ fontWeight: 950 }}>
+                Open my logs & screenshots
+              </Button>
+            </Stack>
           </>
         )}
 
-        <Divider sx={{ my: 2, borderColor: "rgba(255,255,255,0.10)" }} />
+        <Divider sx={{ my: 2, borderColor: "var(--border-1)" }} />
 
         <Typography sx={{ fontWeight: 950, fontSize: 16 }}>System</Typography>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1 }}>

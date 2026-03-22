@@ -3,13 +3,13 @@ import { NavLink, useLocation } from "react-router-dom";
 import { Box, Typography, Stack, Divider, Tooltip, IconButton } from "@mui/material";
 import { useAuth } from "../providers/AuthProvider";
 
-import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
 import PeopleAltRoundedIcon from "@mui/icons-material/PeopleAltRounded";
-import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import BoltRoundedIcon from "@mui/icons-material/BoltRounded";
+import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 
 const ROLE_C_SUITE = "C_SUITE";
 const ROLE_DEPT_HEAD = "DEPARTMENT_HEAD";
+const ROLE_DEPT_MEMBER = "DEPARTMENT_MEMBER";
 
 const linkBase = {
   display: "flex",
@@ -28,14 +28,14 @@ export function SidebarContent({ onNavigate }) {
   const role = String(me?.role_key || me?.role || "").toUpperCase();
 
   const canSeeUsers = role === ROLE_C_SUITE || role === ROLE_DEPT_HEAD;
+  const isMember = role === ROLE_DEPT_MEMBER;
 
-  // Sidebar shows only high-level navigation.
-  // Logs / Screenshots / Insights are available only inside Users -> User Detail tabs.
+  // Simple nav: directory for managers / C-Suite; own logs & screenshots for members.
   const navItems = [
-    { label: "Overview", to: "/dashboard/overview", icon: <DashboardRoundedIcon /> },
-    { label: "Claims", to: "/dashboard/claims", icon: <DashboardRoundedIcon /> },
+    ...(isMember
+      ? [{ label: "My logs & screenshots", to: "/dashboard/my-activity", icon: <ArticleOutlinedIcon /> }]
+      : []),
     ...(canSeeUsers ? [{ label: "Users", to: "/dashboard/users", icon: <PeopleAltRoundedIcon /> }] : []),
-    { label: "Settings", to: "/dashboard/settings", icon: <SettingsRoundedIcon /> },
   ];
 
   return (
@@ -47,11 +47,10 @@ export function SidebarContent({ onNavigate }) {
             height: 40,
             borderRadius: 12,
             border: "1px solid var(--border-1)",
-            background:
-              "radial-gradient(18px 18px at 30% 30%, rgba(79,209,196,0.95), rgba(79,209,196,0.10))",
+            bgcolor: "var(--primary-soft)",
             display: "grid",
             placeItems: "center",
-            color: "var(--text)",
+            color: "var(--primary)",
           }}
         >
           <BoltRoundedIcon />
@@ -113,7 +112,7 @@ export function SidebarContent({ onNavigate }) {
 
       <Box sx={{ px: 0.5 }}>
         <Typography variant="caption" className="muted">
-          v1.0 • Theme • RBAC
+          v1.0 • Users • Logs • Screenshots
         </Typography>
       </Box>
     </Box>

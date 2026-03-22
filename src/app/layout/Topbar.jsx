@@ -3,20 +3,15 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   Box,
   Typography,
-  TextField,
-  InputAdornment,
   IconButton,
   Menu,
   MenuItem,
   Stack,
-  Chip,
   Tooltip,
 } from "@mui/material";
 
-import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import AccountCircleRoundedIcon from "@mui/icons-material/AccountCircleRounded";
-import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import DarkModeRoundedIcon from "@mui/icons-material/DarkModeRounded";
 import LightModeRoundedIcon from "@mui/icons-material/LightModeRounded";
@@ -26,10 +21,7 @@ import { useThemeMode } from "../providers/ThemeProvider";
 function titleFromPath(pathname) {
   const p = pathname.toLowerCase();
   if (p.includes("/profile")) return "Profile";
-  if (p.includes("/overview")) return "Overview";
-  if (p.includes("/logs")) return "Logs";
-  if (p.includes("/screenshots")) return "Screenshots";
-  if (p.includes("/insights")) return "Insights";
+  if (p.includes("/my-activity")) return "My logs & screenshots";
   if (p.includes("/users")) return "Users";
   if (p.includes("/settings")) return "Settings";
   return "Dashboard";
@@ -62,8 +54,6 @@ export default function Topbar({ onOpenSidebar }) {
         px: { xs: 2, md: 3 },
         py: 2,
         borderBottom: "1px solid var(--border-1)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
         background: "var(--surface-1)",
       }}
     >
@@ -81,52 +71,18 @@ export default function Topbar({ onOpenSidebar }) {
           </IconButton>
         </Box>
 
-        <Box sx={{ minWidth: 200 }}>
+        <Box sx={{ minWidth: 160 }}>
           <Typography sx={{ fontWeight: 900, fontSize: 18, color: "var(--text)" }}>
             {pageTitle}
           </Typography>
           <Typography variant="caption" className="muted">
-            Monitoring dashboard
+            Discovery Agent
           </Typography>
         </Box>
 
         <Box sx={{ flex: 1 }} />
 
-        <TextField
-          size="small"
-          placeholder="Search logs, users, devices..."
-          sx={{
-            width: { xs: 180, sm: 240, md: 380 },
-            "& .MuiOutlinedInput-root": {
-              borderRadius: 999,
-              background: "var(--surface-3)",
-              border: "1px solid var(--border-1)",
-              color: "var(--text)",
-            },
-            "& fieldset": { border: "none" },
-          }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchRoundedIcon />
-              </InputAdornment>
-            ),
-          }}
-        />
-
-        <Chip
-          icon={<TuneRoundedIcon />}
-          label="Filters"
-          variant="outlined"
-          sx={{
-            borderColor: "var(--border-1)",
-            color: "var(--text)",
-            backgroundColor: "var(--surface-3)",
-            "& .MuiChip-icon": { color: "var(--muted)" },
-          }}
-        />
-
-        <Tooltip title={mode === "dark" ? "Switch to Light" : "Switch to Dark"}>
+        <Tooltip title={mode === "dark" ? "Light mode" : "Dark mode"}>
           <IconButton
             onClick={toggleMode}
             sx={{

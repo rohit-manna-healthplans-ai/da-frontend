@@ -20,7 +20,6 @@ import { useNavigate } from "react-router-dom";
 
 import { AuthContext } from "../../app/providers/AuthProvider";
 import { forgotPasswordApi } from "../../features/auth/auth.api";
-import WavyBackground from "../../components/ui/WavyBackground";
 
 export default function Login() {
   const nav = useNavigate();
@@ -97,11 +96,7 @@ export default function Login() {
         px: 2,
       }}
     >
-      <WavyBackground />
-
       <Box sx={{ position: "relative", width: "100%", display: "flex", justifyContent: "center" }}>
-        <div className="login-glow" aria-hidden="true" />
-
         <Paper
           className="glass login-card"
           elevation={0}

@@ -2,11 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from "
 import { createTheme, ThemeProvider as MuiThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 
-/**
- * Real Light/Dark theme support
- * - MUI theme switches
- * - Full page switches via CSS variables (index.css) using `data-theme` on <html>
- */
+/** Syncs with index.css variables via data-theme on <html> — palette from brand sheets. */
 
 const STORAGE_KEY = "iw_theme_mode";
 
@@ -26,14 +22,12 @@ function buildTheme(mode) {
   return createTheme({
     palette: {
       mode,
-      // Palette aligned with the provided brand sheets
-      primary: { main: dark ? "#4FD1DD" : "#38B6C1" },
+      primary: { main: dark ? "#4FD1DD" : "#38B6C1", dark: dark ? "#2CB1BC" : "#2B98A2" },
       secondary: { main: dark ? "#2CB1BC" : "#2B98A2" },
       success: { main: "#22c55e" },
       warning: { main: "#f59e0b" },
-      error: { main: "#ff6b6b" },
+      error: { main: "#ef4444" },
       background: {
-        // Primary/secondary backgrounds
         default: dark ? "#003366" : "#A3CEF2",
         paper: dark ? "#183845" : "#BEEBFF",
       },
@@ -41,18 +35,17 @@ function buildTheme(mode) {
         primary: dark ? "#F3F8FB" : "#111827",
         secondary: dark ? "#B7C8D2" : "rgba(17,24,39,0.72)",
       },
-      divider: dark ? "rgba(247,250,252,0.10)" : "rgba(15,23,42,0.12)",
+      divider: dark ? "rgba(243,248,251,0.12)" : "rgba(17,24,39,0.12)",
     },
-    // Less bubble-like rounding
-    shape: { borderRadius: 16 },
+    shape: { borderRadius: 14 },
     typography: {
-      fontFamily: ["Inter", "system-ui", "Segoe UI", "Roboto", "Arial"].join(","),
+      fontFamily: ['system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Arial'].join(','),
     },
     components: {
       MuiCssBaseline: {
         styleOverrides: {
           body: {
-            backgroundColor: dark ? "#050810" : "#F6F8FB",
+            backgroundColor: dark ? "#003366" : "#A3CEF2",
           },
         },
       },
@@ -71,7 +64,12 @@ function buildTheme(mode) {
           root: {
             textTransform: "none",
             borderRadius: 12,
-            fontWeight: 800,
+            fontWeight: 700,
+          },
+          containedPrimary: {
+            "&:hover": {
+              backgroundColor: dark ? "#2CB1BC" : "#2B98A2",
+            },
           },
         },
       },
@@ -93,8 +91,6 @@ export default function ThemeProvider({ children }) {
     try {
       localStorage.setItem(STORAGE_KEY, mode);
     } catch (_) {}
-
-    // THIS is what makes full screen light/dark
     document.documentElement.setAttribute("data-theme", mode);
   }, [mode]);
 

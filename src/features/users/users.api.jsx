@@ -16,11 +16,6 @@ export async function getUserApi(companyUsername) {
   return unwrap(res);
 }
 
-export async function getUserAnalysisApi(companyUsername, params = {}) {
-  const res = await http.get(`/api/users/${encodeURIComponent(companyUsername)}/analysis`, { params });
-  return unwrap(res);
-}
-
 export async function createUserApi(payload) {
   const res = await http.post("/api/users", payload);
   return unwrap(res);

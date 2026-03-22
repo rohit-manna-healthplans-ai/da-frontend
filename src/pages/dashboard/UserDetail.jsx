@@ -15,28 +15,21 @@ import {
   Tooltip,
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
-import UpdateRoundedIcon from "@mui/icons-material/UpdateRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 import ViewListRoundedIcon from "@mui/icons-material/ViewListRounded";
 import { useNavigate, useParams } from "react-router-dom";
 
 import PageHeader from "../../components/ui/PageHeader";
-import ChartCard from "../../components/charts/ChartCard";
-import ActivityTrendLine from "../../components/charts/ActivityTrendLine";
-import TopBarChart from "../../components/charts/TopBarChart";
-import CategoryPie from "../../components/charts/CategoryPie";
 
 import { useUserSelection } from "../../app/providers/UserSelectionProvider";
-import { getUserApi, getUserAnalysisApi } from "../../features/users/users.api";
+import { useAuth } from "../../app/providers/AuthProvider";
+import { getUserApi } from "../../features/users/users.api";
 import { getLogs, getScreenshots } from "../../services/data.api";
 
 /**
- * UserDetail.jsx (UI upgrade, functionality preserved)
- * - Keeps existing APIs & data-loading flow intact
- * - Logs: proper table, Date+Time split, CSV + PDF download
- * - Screenshots: Google-Drive-like Grid/List toggle + hyperlink for URL + UI-only tags column
- * - Analysis: unchanged charts + KPI row
+ * UserDetail — logs + screenshots.
+ * selfMode: department member viewing only their own data.
  */
 
 function ymdLocal(d) {
@@ -55,14 +48,6 @@ function defaultLast7() {
 
 function formatNumber(n) {
   return Number(n || 0).toLocaleString();
-}
-
-function formatMinutesToHrs(mins) {
-  const m = Math.max(0, Math.floor(Number(mins || 0)));
-  const h = Math.floor(m / 60);
-  const r = m % 60;
-  if (h <= 0) return `${r}m`;
-  return `${h}h ${r}m`;
 }
 
 function normalizeListResponse(res) {
@@ -103,25 +88,6 @@ function fmtTime(ts) {
   } catch {
     return "—";
   }
-}
-
-function KpiRow({ analysis }) {
-  const k = analysis?.kpis || {};
-  return (
-    <Stack direction={{ xs: "column", md: "row" }} spacing={1} flexWrap="wrap" useFlexGap>
-      <Chip variant="outlined" label={`Active: ${formatMinutesToHrs(k.total_active_minutes)}`} />
-      <Chip variant="outlined" label={`Logs: ${formatNumber(k.logs)}`} />
-      <Chip variant="outlined" label={`Screenshots: ${formatNumber(k.screenshots)}`} />
-      <Chip variant="outlined" label={`Apps: ${formatNumber(k.total_apps)}`} />
-      <Chip variant="outlined" label={`Most used: ${k.most_used_app || "—"}`} />
-      <Chip variant="outlined" label={`Top category: ${k.top_category || "—"}`} />
-      <Chip
-        variant="outlined"
-        icon={<UpdateRoundedIcon fontSize="small" />}
-        label={`Updated: ${k.last_updated || "—"}`}
-      />
-    </Stack>
-  );
 }
 
 function downloadLogsCSV(rows) {
@@ -301,13 +267,13 @@ function ScreenshotGrid({ rows = [] }) {
               {safeText(r.window_title)}
             </Typography>
             <Typography sx={{ fontSize: 12, color: "text.secondary" }} noWrap title={safeText(r.application)}>
-              {safeText(r.application)} • {safeText(r.label)}
+              {safeText(r.application)}
+              {r.operation ? ` • ${safeText(r.operation)}` : ""}
             </Typography>
 
-            <Stack direction="row" spacing={1} sx={{ mt: 1 }} alignItems="center" justifyContent="space-between">
-              <Chip size="small" variant="outlined" label="OCR: UI only" />
+            <Stack direction="row" spacing={1} sx={{ mt: 1 }} alignItems="center" justifyContent="flex-end">
               {r.screenshot_url ? (
-                <a href={r.screenshot_url} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
+                <a href={r.screenshot_url} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 700 }}>
                   Open
                 </a>
               ) : null}
@@ -320,12 +286,13 @@ function ScreenshotGrid({ rows = [] }) {
 }
 
 function ScreenshotList({ rows = [] }) {
+  const cols = "200px 160px 1.5fr 120px minmax(180px, 1.2fr)";
   return (
     <Paper elevation={0} sx={{ overflow: "auto" }}>
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: "200px 160px 1.6fr 110px 1.6fr 140px",
+          gridTemplateColumns: cols,
           px: 2,
           py: 1,
           fontWeight: 900,
@@ -337,12 +304,11 @@ function ScreenshotList({ rows = [] }) {
           background: "background.paper",
         }}
       >
-        <div>ts</div>
-        <div>application</div>
-        <div>window_title</div>
-        <div>label</div>
-        <div>screenshot_url</div>
-        <div>tags (OCR)</div>
+        <div>Time</div>
+        <div>Application</div>
+        <div>Window</div>
+        <div>Operation</div>
+        <div>URL</div>
       </Box>
 
       {rows.length === 0 ? (
@@ -355,7 +321,7 @@ function ScreenshotList({ rows = [] }) {
             key={`${r.ts || ""}_${idx}`}
             sx={{
               display: "grid",
-              gridTemplateColumns: "200px 160px 1.6fr 110px 1.6fr 140px",
+              gridTemplateColumns: cols,
               px: 2,
               py: 1,
               fontSize: 13,
@@ -370,7 +336,7 @@ function ScreenshotList({ rows = [] }) {
             <div title={safeText(r.window_title)} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {safeText(r.window_title)}
             </div>
-            <div>{safeText(r.label)}</div>
+            <div title={safeText(r.operation)}>{safeText(r.operation || r.label)}</div>
             <div title={safeText(r.screenshot_url)} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {r.screenshot_url ? (
                 <a href={r.screenshot_url} target="_blank" rel="noreferrer">
@@ -379,9 +345,6 @@ function ScreenshotList({ rows = [] }) {
               ) : (
                 "—"
               )}
-            </div>
-            <div>
-              <Chip size="small" variant="outlined" label="UI only" />
             </div>
           </Box>
         ))
@@ -413,10 +376,15 @@ function ScreenshotsSection({ rows = [] }) {
   );
 }
 
-export default function UserDetail() {
+const ROLE_DEPT_HEAD = "DEPARTMENT_HEAD";
+
+export default function UserDetail({ selfMode = false }) {
   const nav = useNavigate();
   const { company_username } = useParams();
+  const { me } = useAuth();
   const { setSelectedUser } = useUserSelection();
+
+  const myRole = String(me?.role_key || me?.role || "").toUpperCase();
 
   const def = useMemo(() => defaultLast7(), []);
   const [from, setFrom] = useState(def.from);
@@ -426,19 +394,14 @@ export default function UserDetail() {
   const [tab, setTab] = useState(0);
 
   const [userLoading, setUserLoading] = useState(true);
-  const [analysisLoading, setAnalysisLoading] = useState(false);
   const [logsLoading, setLogsLoading] = useState(false);
   const [shotsLoading, setShotsLoading] = useState(false);
 
   const [error, setError] = useState("");
   const [user, setUser] = useState(null);
-  const [analysis, setAnalysis] = useState(null);
   const [logs, setLogs] = useState({ items: [], total: 0 });
   const [shots, setShots] = useState({ items: [], total: 0 });
 
-  
-
-  // Show-more (UI only): load in chunks
   const LOGS_PAGE_SIZE = 100;
   const SHOTS_PAGE_SIZE = 50;
 
@@ -446,10 +409,17 @@ export default function UserDetail() {
   const [shotsPage, setShotsPage] = useState(1);
   const [logsHasMore, setLogsHasMore] = useState(false);
   const [shotsHasMore, setShotsHasMore] = useState(false);
-const params = useMemo(() => ({ from: applied.from, to: applied.to }), [applied]);
 
-  // prevents selection-sync loops that cause repeated fetching elsewhere
+  const params = useMemo(() => ({ from: applied.from, to: applied.to }), [applied]);
+
   const lastSelectedKeyRef = useRef("");
+
+  const routeEmailKey = useMemo(() => {
+    if (selfMode) {
+      return String(me?.company_username_norm || me?.company_username || me?.email || "").trim();
+    }
+    return decodeURIComponent(company_username || "");
+  }, [selfMode, me?.company_username_norm, me?.company_username, me?.email, company_username]);
 
   useEffect(() => {
     let mounted = true;
@@ -459,16 +429,35 @@ const params = useMemo(() => ({ from: applied.from, to: applied.to }), [applied]
       setUserLoading(true);
 
       try {
-        const routeKey = decodeURIComponent(company_username || "");
+        if (selfMode && !routeEmailKey) {
+          throw new Error("Your account is missing a company email — cannot load activity.");
+        }
+
+        const routeKey = routeEmailKey;
         const u = await getUserApi(routeKey);
         if (!mounted) return;
+
+        if (myRole === ROLE_DEPT_HEAD && me?.department && u?.department) {
+          if (String(u.department).trim() !== String(me.department).trim()) {
+            setError("You can only open users in your department.");
+            setUser(null);
+            setLogs({ items: [], total: 0 });
+            setShots({ items: [], total: 0 });
+            if (mounted) {
+              setUserLoading(false);
+              setLogsLoading(false);
+              setShotsLoading(false);
+            }
+            nav("/dashboard/users", { replace: true });
+            return;
+          }
+        }
 
         setUser(u);
 
         const userKey = u?.company_username_norm || u?.company_username || routeKey;
         const userId = u?.user_mac_id || u?._id || "";
 
-        // Only set selected user when it actually changes
         if (lastSelectedKeyRef.current !== userKey) {
           lastSelectedKeyRef.current = userKey;
           setSelectedUser({
@@ -481,30 +470,21 @@ const params = useMemo(() => ({ from: applied.from, to: applied.to }), [applied]
           });
         }
 
-        setAnalysisLoading(true);
         setLogsLoading(true);
         setShotsLoading(true);
 
-        // reset paging on each load
         setLogsPage(1);
         setShotsPage(1);
 
-        // Prefer unique mac/id for all downstream queries.
-        // Falling back to email-based scoping can merge data if
-        // company_username isn't unique (or normalization mismatches).
         const userScopeParams = userId ? { user_mac_id: userId } : { company_username: userKey };
 
-        const [aRes, lRes, sRes] = await Promise.allSettled([
-          // ✅ Use unique id for analysis to avoid merged results
-          getUserAnalysisApi(userId || userKey, params),
+        const [lRes, sRes] = await Promise.allSettled([
           getLogs({ ...params, ...userScopeParams, page: 1, limit: LOGS_PAGE_SIZE }),
           getScreenshots({ ...params, ...userScopeParams, page: 1, limit: SHOTS_PAGE_SIZE }),
         ]);
 
         if (!mounted) return;
 
-        setAnalysis(aRes.status === "fulfilled" ? aRes.value : null);
-        {
         const logsNorm = lRes.status === "fulfilled" ? normalizeListResponse(lRes.value) : { items: [], total: 0 };
         setLogs(logsNorm);
         setLogsHasMore((logsNorm.items?.length || 0) < (logsNorm.total || 0));
@@ -512,9 +492,8 @@ const params = useMemo(() => ({ from: applied.from, to: applied.to }), [applied]
         const shotsNorm = sRes.status === "fulfilled" ? normalizeListResponse(sRes.value) : { items: [], total: 0 };
         setShots(shotsNorm);
         setShotsHasMore((shotsNorm.items?.length || 0) < (shotsNorm.total || 0));
-      }
 
-        const errs = [aRes, lRes, sRes]
+        const errs = [lRes, sRes]
           .filter((x) => x.status === "rejected")
           .map((x) => x.reason?.message || "Request failed");
 
@@ -523,13 +502,11 @@ const params = useMemo(() => ({ from: applied.from, to: applied.to }), [applied]
         if (!mounted) return;
         setError(e?.message || "Failed to load user detail.");
         setUser(null);
-        setAnalysis(null);
         setLogs({ items: [], total: 0 });
         setShots({ items: [], total: 0 });
       } finally {
         if (!mounted) return;
         setUserLoading(false);
-        setAnalysisLoading(false);
         setLogsLoading(false);
         setShotsLoading(false);
       }
@@ -540,23 +517,17 @@ const params = useMemo(() => ({ from: applied.from, to: applied.to }), [applied]
       mounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [company_username, params]);
+  }, [routeEmailKey, params, selfMode, myRole, me?.department, nav]);
 
-  const title = user?.full_name || user?.company_username_norm || user?.company_username || "User";
-  const charts = analysis?.charts || {};
-  const topAppsItems = charts?.top_apps?.items || [];
-  const topCatsItems = charts?.top_categories?.items || [];
-  const catPieItems = topCatsItems.slice(0, 12);
+  const title = selfMode
+    ? "My activity"
+    : user?.full_name || user?.company_username_norm || user?.company_username || "User";
 
-  const contentLoading =
-    (tab === 0 && analysisLoading) ||
-    (tab === 1 && logsLoading) ||
-    (tab === 2 && shotsLoading);
-
+  const contentLoading = (tab === 0 && logsLoading) || (tab === 1 && shotsLoading);
 
   async function loadMoreLogs() {
     if (!user || logsLoading || !logsHasMore) return;
-    const routeKey = decodeURIComponent(company_username || "");
+    const routeKey = routeEmailKey;
     const userKey = user?.company_username_norm || user?.company_username || routeKey;
     const userId = user?.user_mac_id || user?._id || "";
     const userScopeParams = userId ? { user_mac_id: userId } : { company_username: userKey };
@@ -587,7 +558,7 @@ const params = useMemo(() => ({ from: applied.from, to: applied.to }), [applied]
 
   async function loadMoreShots() {
     if (!user || shotsLoading || !shotsHasMore) return;
-    const routeKey = decodeURIComponent(company_username || "");
+    const routeKey = routeEmailKey;
     const userKey = user?.company_username_norm || user?.company_username || routeKey;
     const userId = user?.user_mac_id || user?._id || "";
     const userScopeParams = userId ? { user_mac_id: userId } : { company_username: userKey };
@@ -625,15 +596,18 @@ const params = useMemo(() => ({ from: applied.from, to: applied.to }), [applied]
     <Box className="dash-page">
       <PageHeader
         title={title}
-        subtitle={user?.company_username_norm || user?.company_username || "—"}
+        subtitle={user?.company_username_norm || user?.company_username || routeEmailKey || "—"}
         right={
-          <Button
-            variant="outlined"
-            startIcon={<ArrowBackRoundedIcon />}
-            onClick={() => nav("/dashboard/users")}
-          >
-            Back
-          </Button>
+          selfMode ? null : (
+            <Button
+              variant="outlined"
+              startIcon={<ArrowBackRoundedIcon />}
+              onClick={() => nav("/dashboard/users")}
+              sx={{ fontWeight: 800 }}
+            >
+              Back to users
+            </Button>
+          )
         }
       />
 
@@ -646,10 +620,16 @@ const params = useMemo(() => ({ from: applied.from, to: applied.to }), [applied]
             justifyContent="space-between"
           >
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-              <Chip size="small" variant="outlined" label={`Department: ${user?.department || "—"}`} />
-              <Chip size="small" variant="outlined" label={`Role: ${user?.role_key || "—"}`} />
-              <Chip size="small" variant="outlined" label={`MAC: ${user?.user_mac_id || user?._id || "—"}`} />
-              <Chip size="small" variant="outlined" label={user?.is_active ? "Active" : "Inactive"} />
+              {!selfMode ? (
+                <>
+                  <Chip size="small" variant="outlined" label={`Department: ${user?.department || "—"}`} />
+                  <Chip size="small" variant="outlined" label={`Role: ${user?.role_key || "—"}`} />
+                  <Chip size="small" variant="outlined" label={`MAC: ${user?.user_mac_id || user?._id || "—"}`} />
+                  <Chip size="small" variant="outlined" label={user?.is_active ? "Active" : "Inactive"} />
+                </>
+              ) : (
+                <Chip size="small" variant="outlined" label={`Department: ${user?.department || me?.department || "—"}`} />
+              )}
             </Stack>
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="center">
@@ -681,13 +661,11 @@ const params = useMemo(() => ({ from: applied.from, to: applied.to }), [applied]
           </Stack>
 
           {error ? <Typography color="error">{error}</Typography> : null}
-          {analysis ? <KpiRow analysis={analysis} /> : null}
         </Stack>
       </Paper>
 
       <Paper className="glass" elevation={0} sx={{ p: 1 }}>
         <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" scrollButtons="auto">
-          <Tab label="Analysis" />
           <Tab label={`Logs (${formatNumber(logs?.total || logs?.items?.length || 0)})`} />
           <Tab label={`Screenshots (${formatNumber(shots?.total || shots?.items?.length || 0)})`} />
         </Tabs>
@@ -696,7 +674,7 @@ const params = useMemo(() => ({ from: applied.from, to: applied.to }), [applied]
       <Divider sx={{ my: 2, borderColor: "var(--border-1)" }} />
 
       {userLoading ? (
-        <Typography className="muted">Loading user…</Typography>
+        <Typography className="muted">Loading…</Typography>
       ) : contentLoading ? (
         <Box sx={{ py: 4, display: "grid", placeItems: "center" }}>
           <CircularProgress />
@@ -705,55 +683,6 @@ const params = useMemo(() => ({ from: applied.from, to: applied.to }), [applied]
           </Typography>
         </Box>
       ) : tab === 0 ? (
-        <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: "repeat(12, 1fr)" }}>
-          <Box sx={{ gridColumn: { xs: "span 12", lg: "span 7" } }}>
-            <ChartCard title="Activity Over Time" subtitle="Active minutes per day">
-              <ActivityTrendLine
-                labels={charts.activity_over_time?.labels || []}
-                series={charts.activity_over_time?.series || []}
-              />
-            </ChartCard>
-          </Box>
-
-          <Box sx={{ gridColumn: { xs: "span 12", lg: "span 5" } }}>
-            <ChartCard title="Top Apps" subtitle="Most used apps">
-              <TopBarChart items={topAppsItems} />
-            </ChartCard>
-          </Box>
-
-          <Box sx={{ gridColumn: { xs: "span 12", lg: "span 7" } }}>
-            <ChartCard title="Logs Over Time" subtitle="Logs per day">
-              <ActivityTrendLine
-                labels={charts.logs_over_time?.labels || []}
-                series={charts.logs_over_time?.series || []}
-              />
-            </ChartCard>
-          </Box>
-
-          <Box sx={{ gridColumn: { xs: "span 12", lg: "span 5" } }}>
-            <ChartCard title="Category Distribution" subtitle="Top categories">
-              <CategoryPie items={catPieItems.map((x) => ({ name: x.name, count: x.count }))} />
-            </ChartCard>
-          </Box>
-
-          <Box sx={{ gridColumn: "span 12" }}>
-            <ChartCard title="Screenshots Over Time" subtitle="Screenshots per day">
-              <ActivityTrendLine
-                labels={charts.screenshots_over_time?.labels || []}
-                series={charts.screenshots_over_time?.series || []}
-              />
-            </ChartCard>
-          </Box>
-
-          {!analysis ? (
-            <Paper className="glass" elevation={0} sx={{ p: 2, gridColumn: "span 12" }}>
-              <Typography className="muted">
-                No analysis data returned for this range (or you don't have scope).
-              </Typography>
-            </Paper>
-          ) : null}
-        </Box>
-      ) : tab === 1 ? (
         <Paper className="glass" elevation={0} sx={{ p: 2 }}>
           <LogsTable rows={logs?.items || []} />
 

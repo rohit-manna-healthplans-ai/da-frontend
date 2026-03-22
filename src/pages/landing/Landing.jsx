@@ -24,7 +24,7 @@ export default function Landing() {
       <Stack spacing={3} alignItems="center">
         <Box component="img" src="/logo.png" alt="Logo" sx={{ height: 64, mb: 1 }} />
         <Typography sx={{ color: "text.secondary", fontSize: 14, maxWidth: 420, textAlign: "center" }}>
-          Monitor logs, screenshots, user activity insights, and RBAC-scoped views — all in one place.
+          View users, logs, and screenshots — with role-based access for your organization.
         </Typography>
         <Button
           variant="contained"
