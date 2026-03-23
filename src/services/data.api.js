@@ -26,3 +26,11 @@ export async function getScreenshots(params = {}) {
   });
   return unwrap(res); // { items, page, limit, total }
 }
+
+/** Time-limited SAS URL to view a private Azure blob (backend generates SAS). */
+export async function getScreenshotSasUrl(screenshotId) {
+  const id = encodeURIComponent(String(screenshotId || "").trim());
+  if (!id) throw new Error("Missing screenshot id");
+  const res = await http.get(`/api/screenshots/${id}/sas-url`);
+  return unwrap(res); // { url } or { sas_url }
+}

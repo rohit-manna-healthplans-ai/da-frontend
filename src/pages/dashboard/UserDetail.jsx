@@ -8,6 +8,12 @@ import {
   Stack,
   Tab,
   Tabs,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
   Typography,
   CircularProgress,
@@ -18,6 +24,7 @@ import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 import ViewListRoundedIcon from "@mui/icons-material/ViewListRounded";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import { useNavigate, useParams } from "react-router-dom";
 
 import PageHeader from "../../components/ui/PageHeader";
@@ -25,7 +32,7 @@ import PageHeader from "../../components/ui/PageHeader";
 import { useUserSelection } from "../../app/providers/UserSelectionProvider";
 import { useAuth } from "../../app/providers/AuthProvider";
 import { getUserApi } from "../../features/users/users.api";
-import { getLogs, getScreenshots } from "../../services/data.api";
+import { getLogs, getScreenshots, getScreenshotSasUrl } from "../../services/data.api";
 
 /**
  * UserDetail — logs + screenshots.
@@ -90,8 +97,31 @@ function fmtTime(ts) {
   }
 }
 
+function logScreenshotId(r) {
+  const v = r?.screenshot_id ?? r?.screenshotId;
+  if (v === null || v === undefined || v === "") return null;
+  return String(v);
+}
+
+/** screenshot document / log row — id for GET /api/screenshots/:id/sas-url */
+function screenshotLookupKey(r) {
+  if (!r) return null;
+  const a = r.screenshot_id ?? r.screenshotId;
+  if (a !== null && a !== undefined && String(a).trim() !== "") return String(a).trim();
+  if (r._id !== null && r._id !== undefined && String(r._id).trim() !== "") return String(r._id).trim();
+  return null;
+}
+
+async function openScreenshotSas(sid) {
+  if (!sid) return;
+  const data = await getScreenshotSasUrl(sid);
+  const url = data?.url || data?.sas_url;
+  if (url) window.open(String(url), "_blank", "noopener,noreferrer");
+  else throw new Error("No URL returned from server");
+}
+
 function downloadLogsCSV(rows) {
-  const header = ["Date", "Time", "application", "window_title", "category", "operation", "details"];
+  const header = ["Date", "Time", "application", "window_title", "category", "operation", "details", "screenshot_id"];
   const lines = [
     header.join(","),
     ...rows.map((r) =>
@@ -103,6 +133,7 @@ function downloadLogsCSV(rows) {
         safeText(r.category),
         safeText(r.operation),
         safeText(r.details || r.detail),
+        safeText(logScreenshotId(r) || ""),
       ]
         .map((v) => `"${String(v).replace(/"/g, '""')}"`)
         .join(",")
@@ -117,10 +148,36 @@ function downloadLogsCSV(rows) {
   URL.revokeObjectURL(url);
 }
 
+const logCellWrap = {
+  verticalAlign: "top",
+  whiteSpace: "normal",
+  wordBreak: "break-word",
+  overflowWrap: "anywhere",
+  py: 1.25,
+  px: 1.5,
+  fontSize: 13,
+  color: "var(--text)",
+  borderColor: "var(--border-1)",
+};
+
 function LogsTable({ rows = [] }) {
+  const [openingShot, setOpeningShot] = useState(null);
+
+  async function openScreenshot(sid) {
+    if (!sid) return;
+    setOpeningShot(sid);
+    try {
+      await openScreenshotSas(sid);
+    } catch (e) {
+      window.alert(e?.response?.data?.error || e?.message || "Could not open screenshot.");
+    } finally {
+      setOpeningShot(null);
+    }
+  }
+
   return (
-    <Box>
-      <Stack direction="row" spacing={1} sx={{ mb: 1 }} justifyContent="flex-end">
+    <Box sx={{ width: "100%", minWidth: 0 }}>
+      <Stack direction="row" spacing={1} sx={{ mb: 1 }} justifyContent="flex-end" flexWrap="wrap" useFlexGap>
         <Button
           size="small"
           variant="outlined"
@@ -141,77 +198,206 @@ function LogsTable({ rows = [] }) {
         </Button>
       </Stack>
 
-      <Paper elevation={0} sx={{ overflow: "auto" }}>
-        {/* sticky header */}
-        <Box
+      <Typography variant="caption" className="muted" sx={{ display: "block", mb: 1 }}>
+        Scroll horizontally if needed — full text is shown (no hidden ellipsis).
+      </Typography>
+
+      <TableContainer
+        component={Paper}
+        className="glass"
+        elevation={0}
+        sx={{
+          width: "100%",
+          maxWidth: "100%",
+          overflowX: "auto",
+          overflowY: "visible",
+          border: "1px solid var(--border-1)",
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
+        <Table
+          stickyHeader
+          size="small"
           sx={{
-            display: "grid",
-            gridTemplateColumns: "120px 95px 160px 1.6fr 140px 140px 2fr",
-            px: 2,
-            py: 1,
-            fontWeight: 900,
-            fontSize: 13,
-            borderBottom: "1px solid rgba(0,0,0,0.08)",
-            position: "sticky",
-            top: 0,
-            zIndex: 1,
-            background: "background.paper",
+            minWidth: 1320,
+            tableLayout: "fixed",
+            "& .MuiTableCell-root": logCellWrap,
+            "& .MuiTableCell-head": {
+              ...logCellWrap,
+              whiteSpace: "nowrap",
+              fontWeight: 800,
+              backgroundColor: "var(--surface-3) !important",
+              zIndex: 2,
+            },
+            "& .MuiTableRow-root:hover .MuiTableCell-body": {
+              backgroundColor: "rgba(0,0,0,0.03)",
+            },
           }}
         >
-          <div>Date</div>
-          <div>Time</div>
-          <div>Application</div>
-          <div>Window Title</div>
-          <div>Category</div>
-          <div>Operation</div>
-          <div>Details</div>
-        </Box>
-
-        {rows.length === 0 ? (
-          <Box sx={{ p: 2 }}>
-            <Typography color="text.secondary">No logs for this range.</Typography>
-          </Box>
-        ) : (
-          rows.map((r, idx) => (
-            <Box
-              key={`${r.ts || ""}_${idx}`}
-              sx={{
-                display: "grid",
-                gridTemplateColumns: "120px 95px 160px 1.6fr 140px 140px 2fr",
-                px: 2,
-                py: 1,
-                fontSize: 13,
-                borderBottom: "1px solid rgba(0,0,0,0.05)",
-                "&:hover": { background: "rgba(0,0,0,0.03)" },
-              }}
-            >
-              <div style={{ whiteSpace: "nowrap" }}>{fmtDate(r.ts)}</div>
-              <div style={{ whiteSpace: "nowrap" }}>{fmtTime(r.ts)}</div>
-              <div title={safeText(r.application)} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {safeText(r.application)}
-              </div>
-              <div title={safeText(r.window_title)} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {safeText(r.window_title)}
-              </div>
-              <div title={safeText(r.category)} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {safeText(r.category)}
-              </div>
-              <div title={safeText(r.operation)} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {safeText(r.operation)}
-              </div>
-              <div title={safeText(r.details || r.detail)} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {safeText(r.details || r.detail)}
-              </div>
-            </Box>
-          ))
-        )}
-      </Paper>
+          <colgroup>
+            <col style={{ width: 108 }} />
+            <col style={{ width: 88 }} />
+            <col style={{ width: 150 }} />
+            <col style={{ width: 260 }} />
+            <col style={{ width: 120 }} />
+            <col style={{ width: 120 }} />
+            <col style={{ width: "auto", minWidth: 280 }} />
+            <col style={{ width: 96 }} />
+          </colgroup>
+          <TableHead>
+            <TableRow>
+              <TableCell>Date</TableCell>
+              <TableCell>Time</TableCell>
+              <TableCell>Application</TableCell>
+              <TableCell>Window title</TableCell>
+              <TableCell>Category</TableCell>
+              <TableCell>Operation</TableCell>
+              <TableCell>Details</TableCell>
+              <TableCell align="center">Screenshot</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8}>
+                  <Typography color="text.secondary">No logs for this range.</Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((r, idx) => {
+                const sid = logScreenshotId(r);
+                return (
+                  <TableRow key={`${r.ts || ""}_${idx}`} hover>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>{fmtDate(r.ts)}</TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>{fmtTime(r.ts)}</TableCell>
+                    <TableCell>{safeText(r.application)}</TableCell>
+                    <TableCell>{safeText(r.window_title)}</TableCell>
+                    <TableCell>{safeText(r.category)}</TableCell>
+                    <TableCell>{safeText(r.operation)}</TableCell>
+                    <TableCell>{safeText(r.details || r.detail)}</TableCell>
+                    <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
+                      {sid ? (
+                        <Tooltip title="View screenshot (opens new tab)">
+                          <span>
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              aria-label="View screenshot"
+                              disabled={openingShot === sid}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openScreenshot(sid);
+                              }}
+                            >
+                              <VisibilityOutlinedIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      ) : (
+                        <Typography variant="caption" className="muted">
+                          —
+                        </Typography>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
     </Box>
   );
 }
 
-function isHttpUrl(u) {
-  return typeof u === "string" && (u.startsWith("http://") || u.startsWith("https://"));
+function ScreenshotCard({ row }) {
+  const sid = screenshotLookupKey(row);
+  const [src, setSrc] = useState(null);
+  const [loadErr, setLoadErr] = useState(false);
+  const [loading, setLoading] = useState(Boolean(sid));
+
+  useEffect(() => {
+    if (!sid) {
+      setLoading(false);
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await getScreenshotSasUrl(sid);
+        const url = data?.url || data?.sas_url;
+        if (!cancelled && url) setSrc(url);
+      } catch {
+        if (!cancelled) setLoadErr(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sid]);
+
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: 1,
+        borderRadius: 2,
+        border: "1px solid var(--border-1)",
+        "&:hover": { background: "rgba(0,0,0,0.03)" },
+      }}
+    >
+      <Box
+        sx={{
+          height: 140,
+          borderRadius: 1,
+          overflow: "hidden",
+          background: "rgba(0,0,0,0.06)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {loading ? (
+          <CircularProgress size={28} />
+        ) : src ? (
+          <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : (
+          <Typography variant="caption" color="text.secondary" sx={{ px: 1, textAlign: "center" }}>
+            {!sid ? "No screenshot id" : loadErr ? "Could not load preview (check Azure env on server)" : "No preview"}
+          </Typography>
+        )}
+      </Box>
+
+      <Typography sx={{ fontSize: 13, fontWeight: 700, mt: 1, wordBreak: "break-word" }} title={safeText(row.window_title)}>
+        {safeText(row.window_title)}
+      </Typography>
+      <Typography sx={{ fontSize: 12, color: "text.secondary", wordBreak: "break-word" }} title={safeText(row.application)}>
+        {safeText(row.application)}
+        {row.operation ? ` • ${safeText(row.operation)}` : ""}
+      </Typography>
+
+      <Stack direction="row" spacing={1} sx={{ mt: 1 }} alignItems="center" justifyContent="flex-end">
+        {sid ? (
+          <Button
+            size="small"
+            variant="text"
+            sx={{ fontWeight: 800, fontSize: 12 }}
+            onClick={async () => {
+              try {
+                await openScreenshotSas(sid);
+              } catch (e) {
+                window.alert(e?.response?.data?.error || e?.message || "Could not open screenshot.");
+              }
+            }}
+          >
+            Open (new SAS)
+          </Button>
+        ) : null}
+      </Stack>
+    </Paper>
+  );
 }
 
 function ScreenshotGrid({ rows = [] }) {
@@ -228,128 +414,124 @@ function ScreenshotGrid({ rows = [] }) {
           <Typography color="text.secondary">No screenshots for this range.</Typography>
         </Paper>
       ) : (
-        rows.map((r, idx) => (
-          <Paper
-            key={`${r.ts || ""}_${idx}`}
-            elevation={0}
-            sx={{
-              p: 1,
-              borderRadius: 2,
-              border: "1px solid rgba(0,0,0,0.06)",
-              "&:hover": { background: "rgba(0,0,0,0.03)" },
-            }}
-          >
-            <Box
-              sx={{
-                height: 140,
-                borderRadius: 1,
-                overflow: "hidden",
-                background: "rgba(0,0,0,0.06)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {isHttpUrl(r.screenshot_url) ? (
-                <img
-                  src={r.screenshot_url}
-                  alt="screenshot"
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              ) : (
-                <Typography variant="caption" color="text.secondary">
-                  No preview
-                </Typography>
-              )}
-            </Box>
-
-            <Typography sx={{ fontSize: 13, fontWeight: 700, mt: 1 }} noWrap title={safeText(r.window_title)}>
-              {safeText(r.window_title)}
-            </Typography>
-            <Typography sx={{ fontSize: 12, color: "text.secondary" }} noWrap title={safeText(r.application)}>
-              {safeText(r.application)}
-              {r.operation ? ` • ${safeText(r.operation)}` : ""}
-            </Typography>
-
-            <Stack direction="row" spacing={1} sx={{ mt: 1 }} alignItems="center" justifyContent="flex-end">
-              {r.screenshot_url ? (
-                <a href={r.screenshot_url} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 700 }}>
-                  Open
-                </a>
-              ) : null}
-            </Stack>
-          </Paper>
-        ))
+        rows.map((r, idx) => <ScreenshotCard key={`${screenshotLookupKey(r) || r.ts || ""}_${idx}`} row={r} />)
       )}
     </Box>
   );
 }
 
 function ScreenshotList({ rows = [] }) {
-  const cols = "200px 160px 1.5fr 120px minmax(180px, 1.2fr)";
   return (
-    <Paper elevation={0} sx={{ overflow: "auto" }}>
-      <Box
+    <Box sx={{ width: "100%", minWidth: 0 }}>
+      <Typography variant="caption" className="muted" sx={{ display: "block", mb: 1 }}>
+        Scroll horizontally if needed — full URLs and text wrap (nothing clipped with “…”).
+      </Typography>
+      <TableContainer
+        component={Paper}
+        className="glass"
+        elevation={0}
         sx={{
-          display: "grid",
-          gridTemplateColumns: cols,
-          px: 2,
-          py: 1,
-          fontWeight: 900,
-          fontSize: 13,
-          borderBottom: "1px solid rgba(0,0,0,0.08)",
-          position: "sticky",
-          top: 0,
-          zIndex: 1,
-          background: "background.paper",
+          width: "100%",
+          maxWidth: "100%",
+          overflowX: "auto",
+          WebkitOverflowScrolling: "touch",
+          border: "1px solid var(--border-1)",
         }}
       >
-        <div>Time</div>
-        <div>Application</div>
-        <div>Window</div>
-        <div>Operation</div>
-        <div>URL</div>
-      </Box>
-
-      {rows.length === 0 ? (
-        <Box sx={{ p: 2 }}>
-          <Typography color="text.secondary">No screenshots for this range.</Typography>
-        </Box>
-      ) : (
-        rows.map((r, idx) => (
-          <Box
-            key={`${r.ts || ""}_${idx}`}
-            sx={{
-              display: "grid",
-              gridTemplateColumns: cols,
-              px: 2,
-              py: 1,
-              fontSize: 13,
-              borderBottom: "1px solid rgba(0,0,0,0.05)",
-              "&:hover": { background: "rgba(0,0,0,0.03)" },
-            }}
-          >
-            <div style={{ whiteSpace: "nowrap" }}>{safeText(r.ts)}</div>
-            <div title={safeText(r.application)} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {safeText(r.application)}
-            </div>
-            <div title={safeText(r.window_title)} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {safeText(r.window_title)}
-            </div>
-            <div title={safeText(r.operation)}>{safeText(r.operation || r.label)}</div>
-            <div title={safeText(r.screenshot_url)} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {r.screenshot_url ? (
-                <a href={r.screenshot_url} target="_blank" rel="noreferrer">
-                  {safeText(r.screenshot_url)}
-                </a>
-              ) : (
-                "—"
-              )}
-            </div>
-          </Box>
-        ))
-      )}
-    </Paper>
+        <Table
+          stickyHeader
+          size="small"
+          sx={{
+            minWidth: 960,
+            tableLayout: "fixed",
+            "& .MuiTableCell-root": logCellWrap,
+            "& .MuiTableCell-head": {
+              ...logCellWrap,
+              whiteSpace: "nowrap",
+              fontWeight: 800,
+              backgroundColor: "var(--surface-3) !important",
+            },
+            "& .MuiTableRow-root:hover .MuiTableCell-body": {
+              backgroundColor: "rgba(0,0,0,0.03)",
+            },
+          }}
+        >
+          <colgroup>
+            <col style={{ width: 168 }} />
+            <col style={{ width: 160 }} />
+            <col style={{ width: 240 }} />
+            <col style={{ width: 140 }} />
+            <col style={{ width: "auto", minWidth: 260 }} />
+          </colgroup>
+          <TableHead>
+            <TableRow>
+              <TableCell>Time</TableCell>
+              <TableCell>Application</TableCell>
+              <TableCell>Window</TableCell>
+              <TableCell>Operation</TableCell>
+              <TableCell>Blob / view</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5}>
+                  <Typography color="text.secondary">No screenshots for this range.</Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((r, idx) => (
+                <TableRow key={`${r.ts || ""}_${idx}`} hover>
+                  <TableCell sx={{ whiteSpace: "nowrap" }}>{safeText(r.ts)}</TableCell>
+                  <TableCell>{safeText(r.application)}</TableCell>
+                  <TableCell>{safeText(r.window_title)}</TableCell>
+                  <TableCell>{safeText(r.operation || r.label)}</TableCell>
+                  <TableCell sx={{ wordBreak: "break-all" }}>
+                    <Stack spacing={0.75}>
+                      <Typography variant="caption" sx={{ color: "var(--muted)", display: "block" }}>
+                        {r.screenshot_url
+                          ? safeText(r.screenshot_url)
+                          : r.file_path
+                            ? safeText(r.file_path)
+                            : "—"}
+                      </Typography>
+                      {screenshotLookupKey(r) ? (
+                        <Stack direction="row" alignItems="center" spacing={0.5} flexWrap="wrap" useFlexGap>
+                          <Tooltip title="Open image with fresh SAS URL (~1h)">
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              aria-label="View screenshot"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  await openScreenshotSas(screenshotLookupKey(r));
+                                } catch (err) {
+                                  window.alert(err?.response?.data?.error || err?.message || "Failed");
+                                }
+                              }}
+                            >
+                              <VisibilityOutlinedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Typography variant="caption" className="muted">
+                            id: {screenshotLookupKey(r)}
+                          </Typography>
+                        </Stack>
+                      ) : (
+                        <Typography variant="caption" color="text.secondary">
+                          Add screenshot_id to enable SAS view
+                        </Typography>
+                      )}
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Box>
   );
 }
 
