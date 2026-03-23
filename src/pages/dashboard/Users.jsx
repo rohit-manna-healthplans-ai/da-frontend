@@ -40,6 +40,20 @@ const ROLE_C_SUITE = "C_SUITE";
 const ROLE_DEPT_HEAD = "DEPARTMENT_HEAD";
 const ROLE_DEPT_MEMBER = "DEPARTMENT_MEMBER";
 
+/** Strong contrast for avatars + chips on light glass cards */
+const avatarSx = {
+  bgcolor: "var(--primary-soft)",
+  color: "var(--text)",
+  fontWeight: 700,
+  fontSize: "0.95rem",
+  border: "1px solid var(--border-2)",
+};
+const chipSx = {
+  color: "var(--text)",
+  borderColor: "var(--border-2)",
+  "& .MuiChip-label": { fontWeight: 600 },
+};
+
 function roleLabel(role) {
   const r = String(role || "").toUpperCase();
   if (r === ROLE_C_SUITE) return "C-Suite";
@@ -75,7 +89,7 @@ function UserCard({ u, onOpen }) {
       }}
     >
       <Stack direction="row" spacing={1.5} alignItems="center">
-        <Avatar sx={{ width: 44, height: 44, borderRadius: 3, bgcolor: "rgba(79,209,196,0.22)" }}>
+        <Avatar sx={{ width: 44, height: 44, borderRadius: 3, ...avatarSx }}>
           {initials(title)}
         </Avatar>
 
@@ -88,9 +102,24 @@ function UserCard({ u, onOpen }) {
           </Typography>
 
           <Stack direction="row" spacing={1} sx={{ mt: 1 }} flexWrap="wrap" useFlexGap>
-            <Chip size="small" variant="outlined" label={u.department || "No department"} />
-            <Chip size="small" variant={String(u.role_key).toUpperCase() === ROLE_C_SUITE ? "filled" : "outlined"} label={roleLabel(u.role_key)} />
-            <Chip size="small" color={u.is_active ? "success" : "default"} variant="outlined" label={u.is_active ? "Active" : "Inactive"} />
+            <Chip size="small" variant="outlined" label={u.department || "No department"} sx={chipSx} />
+            <Chip
+              size="small"
+              variant={String(u.role_key).toUpperCase() === ROLE_C_SUITE ? "filled" : "outlined"}
+              label={roleLabel(u.role_key)}
+              sx={String(u.role_key).toUpperCase() === ROLE_C_SUITE ? undefined : chipSx}
+            />
+            <Chip
+              size="small"
+              color={u.is_active ? "success" : "warning"}
+              variant="outlined"
+              label={u.is_active ? "Active" : "Inactive"}
+              sx={
+                u.is_active
+                  ? { "& .MuiChip-label": { fontWeight: 600 } }
+                  : { color: "var(--text)", borderColor: "var(--border-2)", "& .MuiChip-label": { fontWeight: 700 } }
+              }
+            />
           </Stack>
         </Box>
 
@@ -118,7 +147,7 @@ function UserRow({ u, onOpen }) {
       }}
     >
       <Stack direction="row" alignItems="center" spacing={1.5}>
-        <Avatar sx={{ width: 36, height: 36, borderRadius: 3, bgcolor: "rgba(99,102,241,0.18)" }}>
+        <Avatar sx={{ width: 36, height: 36, borderRadius: 3, fontSize: "0.85rem", ...avatarSx }}>
           {initials(u.full_name || u.company_username_norm)}
         </Avatar>
 
@@ -131,9 +160,24 @@ function UserRow({ u, onOpen }) {
           </Typography>
         </Box>
 
-        <Chip size="small" variant="outlined" label={u.department || "—"} />
-        <Chip size="small" variant={String(u.role_key).toUpperCase() === ROLE_C_SUITE ? "filled" : "outlined"} label={roleLabel(u.role_key)} />
-        <Chip size="small" color={u.is_active ? "success" : "default"} variant="outlined" label={u.is_active ? "Active" : "Inactive"} />
+        <Chip size="small" variant="outlined" label={u.department || "—"} sx={chipSx} />
+        <Chip
+          size="small"
+          variant={String(u.role_key).toUpperCase() === ROLE_C_SUITE ? "filled" : "outlined"}
+          label={roleLabel(u.role_key)}
+          sx={String(u.role_key).toUpperCase() === ROLE_C_SUITE ? undefined : chipSx}
+        />
+        <Chip
+          size="small"
+          color={u.is_active ? "success" : "warning"}
+          variant="outlined"
+          label={u.is_active ? "Active" : "Inactive"}
+          sx={
+            u.is_active
+              ? { "& .MuiChip-label": { fontWeight: 600 } }
+              : { color: "var(--text)", borderColor: "var(--border-2)", "& .MuiChip-label": { fontWeight: 700 } }
+          }
+        />
       </Stack>
     </Paper>
   );
