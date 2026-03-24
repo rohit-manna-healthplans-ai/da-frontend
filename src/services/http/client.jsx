@@ -14,3 +14,21 @@ http.interceptors.request.use((config) => {
   } catch (_) {}
   return config;
 });
+
+// If C-Suite disables the account, APIs return 403 — clear session and go to login
+http.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    const status = err?.response?.status;
+    const msg = err?.response?.data?.error;
+    if (status === 403 && typeof msg === "string" && msg.toLowerCase().includes("disabled")) {
+      try {
+        localStorage.removeItem("token");
+      } catch (_) {}
+      if (!String(window.location.pathname || "").includes("/login")) {
+        window.location.assign("/login");
+      }
+    }
+    return Promise.reject(err);
+  }
+);
