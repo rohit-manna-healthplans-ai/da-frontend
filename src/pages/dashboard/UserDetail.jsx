@@ -410,13 +410,14 @@ function LogsTable({ rows = [], totalRows = 0, hasMore = false, onEnsureAllRows,
   const hasActiveFilter = Boolean(
     search || categoryFilter !== "all" || operationFilter !== "all" || hasScreenshot !== "all" || dateFrom || dateTo || timeFrom || timeTo
   );
+  const hasNonDefaultSort = !(sortBy === "ts" && sortDir === "desc");
 
   useEffect(() => {
-    if (!hasActiveFilter) return;
+    if (!hasActiveFilter && !hasNonDefaultSort) return;
     if (!hasMore) return;
     if (!onEnsureAllRows) return;
     onEnsureAllRows();
-  }, [hasActiveFilter, hasMore, onEnsureAllRows]);
+  }, [hasActiveFilter, hasNonDefaultSort, hasMore, onEnsureAllRows]);
 
   function SortHead({ id, label, align = "left" }) {
     return (
@@ -1090,13 +1091,14 @@ function ScreenshotsSection({ rows = [], totalRows = 0, hasMore = false, onEnsur
   }, [appFilter, operationFilter, hasId, dateFrom, dateTo, timeFrom, timeTo]);
 
   const hasActiveFilter = Boolean(search || appFilter !== "all" || operationFilter !== "all" || hasId !== "all" || dateFrom || dateTo || timeFrom || timeTo);
+  const hasNonDefaultSort = !(sortBy === "ts" && sortDir === "desc");
 
   useEffect(() => {
-    if (!hasActiveFilter) return;
+    if (!hasActiveFilter && !hasNonDefaultSort) return;
     if (!hasMore) return;
     if (!onEnsureAllRows) return;
     onEnsureAllRows();
-  }, [hasActiveFilter, hasMore, onEnsureAllRows]);
+  }, [hasActiveFilter, hasNonDefaultSort, hasMore, onEnsureAllRows]);
 
   return (
     <Box>
