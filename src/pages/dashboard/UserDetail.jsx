@@ -906,7 +906,7 @@ function ScreenshotList({ rows = [] }) {
           stickyHeader
           size="small"
           sx={{
-            minWidth: 960,
+            minWidth: 1040,
             tableLayout: "fixed",
             "& .MuiTableCell-root": logCellWrap,
             "& .MuiTableCell-head": {
@@ -921,7 +921,8 @@ function ScreenshotList({ rows = [] }) {
           }}
         >
           <colgroup>
-            <col style={{ width: 168 }} />
+            <col style={{ width: 108 }} />
+            <col style={{ width: 88 }} />
             <col style={{ width: 160 }} />
             <col style={{ width: 240 }} />
             <col style={{ width: 140 }} />
@@ -929,6 +930,7 @@ function ScreenshotList({ rows = [] }) {
           </colgroup>
           <TableHead>
             <TableRow>
+              <TableCell>Date</TableCell>
               <TableCell>Time</TableCell>
               <TableCell>Application</TableCell>
               <TableCell>Window</TableCell>
@@ -939,14 +941,15 @@ function ScreenshotList({ rows = [] }) {
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5}>
+                <TableCell colSpan={6}>
                   <Typography color="text.secondary">No screenshots for this range.</Typography>
                 </TableCell>
               </TableRow>
             ) : (
               rows.map((r, idx) => (
                 <TableRow key={`${r.ts || ""}_${idx}`} hover>
-                  <TableCell sx={{ whiteSpace: "nowrap" }}>{safeText(r.ts)}</TableCell>
+                  <TableCell sx={{ whiteSpace: "nowrap" }}>{fmtDate(r.ts)}</TableCell>
+                  <TableCell sx={{ whiteSpace: "nowrap" }}>{fmtTime(r.ts)}</TableCell>
                   <TableCell>{safeText(r.application)}</TableCell>
                   <TableCell>{safeText(r.window_title)}</TableCell>
                   <TableCell>{safeText(r.operation || r.label)}</TableCell>
