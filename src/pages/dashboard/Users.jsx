@@ -36,7 +36,6 @@ import PageHeader from "../../components/ui/PageHeader";
 import { listUsersApi, createUserApi, updateUserApi } from "../../features/users/users.api";
 import { listDepartmentsApi, createDepartmentApi } from "../../features/departments/departments.api";
 import { normalizeDepartmentList } from "../../utils/departments.jsx";
-import { isAgentPluginOnline } from "../../utils/userPresence";
 
 const ROLE_C_SUITE = "C_SUITE";
 const ROLE_DEPT_HEAD = "DEPARTMENT_HEAD";
@@ -75,7 +74,6 @@ function initials(nameOrEmail) {
 function UserCard({ u, onOpen }) {
   const title = u.full_name || u.company_username_norm || u.company_username || "User";
   const sub = u.company_username_norm || u.company_username || "—";
-  const pluginOn = isAgentPluginOnline(u.agent_last_seen_at);
 
   return (
     <Paper
@@ -112,24 +110,17 @@ function UserCard({ u, onOpen }) {
               label={roleLabel(u.role_key)}
               sx={String(u.role_key).toUpperCase() === ROLE_C_SUITE ? undefined : chipSx}
             />
-            <Tooltip title="Plugin / agent: receiving data recently (not web login)">
-              <Chip
-                size="small"
-                color={pluginOn ? "success" : "warning"}
-                variant="outlined"
-                label={pluginOn ? "Active" : "Inactive"}
-                sx={
-                  pluginOn
-                    ? { "& .MuiChip-label": { fontWeight: 600 } }
-                    : { color: "var(--text)", borderColor: "var(--border-2)", "& .MuiChip-label": { fontWeight: 700 } }
-                }
-              />
-            </Tooltip>
-            {u.is_active === false ? (
-              <Tooltip title="Admin disabled web dashboard login for this user">
-                <Chip size="small" variant="outlined" color="warning" label="Dashboard off" sx={{ "& .MuiChip-label": { fontWeight: 700 } }} />
-              </Tooltip>
-            ) : null}
+            <Chip
+              size="small"
+              color={u.is_active ? "success" : "warning"}
+              variant="outlined"
+              label={u.is_active ? "Active" : "Inactive"}
+              sx={
+                u.is_active
+                  ? { "& .MuiChip-label": { fontWeight: 600 } }
+                  : { color: "var(--text)", borderColor: "var(--border-2)", "& .MuiChip-label": { fontWeight: 700 } }
+              }
+            />
           </Stack>
         </Box>
 
@@ -144,8 +135,6 @@ function UserCard({ u, onOpen }) {
 }
 
 function UserRow({ u, onOpen }) {
-  const pluginOn = isAgentPluginOnline(u.agent_last_seen_at);
-
   return (
     <Paper
       className="glass glass-hover"
@@ -179,22 +168,17 @@ function UserRow({ u, onOpen }) {
           label={roleLabel(u.role_key)}
           sx={String(u.role_key).toUpperCase() === ROLE_C_SUITE ? undefined : chipSx}
         />
-        <Tooltip title="Plugin / agent online (recent data)">
-          <Chip
-            size="small"
-            color={pluginOn ? "success" : "warning"}
-            variant="outlined"
-            label={pluginOn ? "Active" : "Inactive"}
-            sx={
-              pluginOn
-                ? { "& .MuiChip-label": { fontWeight: 600 } }
-                : { color: "var(--text)", borderColor: "var(--border-2)", "& .MuiChip-label": { fontWeight: 700 } }
-            }
-          />
-        </Tooltip>
-        {u.is_active === false ? (
-          <Chip size="small" variant="outlined" color="warning" label="Dashboard off" sx={{ "& .MuiChip-label": { fontWeight: 700 } }} />
-        ) : null}
+        <Chip
+          size="small"
+          color={u.is_active ? "success" : "warning"}
+          variant="outlined"
+          label={u.is_active ? "Active" : "Inactive"}
+          sx={
+            u.is_active
+              ? { "& .MuiChip-label": { fontWeight: 600 } }
+              : { color: "var(--text)", borderColor: "var(--border-2)", "& .MuiChip-label": { fontWeight: 700 } }
+          }
+        />
       </Stack>
     </Paper>
   );
@@ -220,8 +204,7 @@ export default function Users() {
   const [q, setQ] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
-  const [agentFilter, setAgentFilter] = useState("all"); // plugin online: all | active | inactive
-  const [accessFilter, setAccessFilter] = useState("all"); // dashboard login: all | allowed | blocked
+  const [statusFilter, setStatusFilter] = useState("all");
   const [sort, setSort] = useState("name"); // name | created
 
   // Admin dialogs (kept)
@@ -291,15 +274,10 @@ export default function Users() {
     if (roleFilter !== "all") {
       rows = rows.filter((u) => String(u.role_key || "").toUpperCase() === roleFilter);
     }
-    if (agentFilter === "active") {
-      rows = rows.filter((u) => isAgentPluginOnline(u.agent_last_seen_at));
-    } else if (agentFilter === "inactive") {
-      rows = rows.filter((u) => !isAgentPluginOnline(u.agent_last_seen_at));
-    }
-    if (accessFilter === "allowed") {
-      rows = rows.filter((u) => u.is_active !== false);
-    } else if (accessFilter === "blocked") {
-      rows = rows.filter((u) => u.is_active === false);
+    if (statusFilter === "active") {
+      rows = rows.filter((u) => Boolean(u.is_active));
+    } else if (statusFilter === "inactive") {
+      rows = rows.filter((u) => !Boolean(u.is_active));
     }
 
     // search
@@ -319,16 +297,15 @@ export default function Users() {
     }
 
     return rows;
-  }, [users, deptFilter, roleFilter, agentFilter, accessFilter, q, sort, me, role]);
+  }, [users, deptFilter, roleFilter, statusFilter, q, sort, me, role]);
 
   const activeFilterCount = useMemo(() => {
     let n = 0;
     if (deptFilter) n += 1;
     if (roleFilter !== "all") n += 1;
-    if (agentFilter !== "all") n += 1;
-    if (accessFilter !== "all") n += 1;
+    if (statusFilter !== "all") n += 1;
     return n;
-  }, [deptFilter, roleFilter, agentFilter, accessFilter]);
+  }, [deptFilter, roleFilter, statusFilter]);
 
   function openUser(u) {
   const email = u.company_username_norm || u.company_username;
@@ -599,20 +576,11 @@ export default function Users() {
               </FormControl>
 
               <FormControl size="small" fullWidth>
-                <InputLabel>Plugin (agent)</InputLabel>
-                <Select value={agentFilter} label="Plugin (agent)" onChange={(e) => setAgentFilter(e.target.value)}>
+                <InputLabel>Status</InputLabel>
+                <Select value={statusFilter} label="Status" onChange={(e) => setStatusFilter(e.target.value)}>
                   <MenuItem value="all">All</MenuItem>
-                  <MenuItem value="active">Active (online)</MenuItem>
-                  <MenuItem value="inactive">Inactive (offline)</MenuItem>
-                </Select>
-              </FormControl>
-
-              <FormControl size="small" fullWidth>
-                <InputLabel>Dashboard access</InputLabel>
-                <Select value={accessFilter} label="Dashboard access" onChange={(e) => setAccessFilter(e.target.value)}>
-                  <MenuItem value="all">All</MenuItem>
-                  <MenuItem value="allowed">Web login allowed</MenuItem>
-                  <MenuItem value="blocked">Web login blocked</MenuItem>
+                  <MenuItem value="active">Active</MenuItem>
+                  <MenuItem value="inactive">Inactive</MenuItem>
                 </Select>
               </FormControl>
 
@@ -629,8 +597,7 @@ export default function Users() {
                 onClick={() => {
                   setDeptFilter("");
                   setRoleFilter("all");
-                  setAgentFilter("all");
-                  setAccessFilter("all");
+                  setStatusFilter("all");
                   setSort("name");
                 }}
               >
@@ -717,17 +684,6 @@ export default function Users() {
                 <MenuItem value={ROLE_C_SUITE}>C-Suite</MenuItem>
               </Select>
             </FormControl>
-            <FormControl>
-              <InputLabel>Dashboard access</InputLabel>
-              <Select
-                value={form.is_active ? "yes" : "no"}
-                label="Dashboard access"
-                onChange={(e) => setForm((s) => ({ ...s, is_active: e.target.value === "yes" }))}
-              >
-                <MenuItem value="yes">Allowed (can log in)</MenuItem>
-                <MenuItem value="no">Blocked (cannot log in)</MenuItem>
-              </Select>
-            </FormControl>
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -770,19 +726,12 @@ export default function Users() {
               </Select>
             </FormControl>
             <FormControl>
-              <InputLabel>Dashboard access</InputLabel>
-              <Select
-                value={form.is_active ? "yes" : "no"}
-                label="Dashboard access"
-                onChange={(e) => setForm((s) => ({ ...s, is_active: e.target.value === "yes" }))}
-              >
-                <MenuItem value="yes">Allowed (can log in)</MenuItem>
-                <MenuItem value="no">Blocked (cannot log in)</MenuItem>
+              <InputLabel>Active</InputLabel>
+              <Select value={form.is_active ? "yes" : "no"} label="Active" onChange={(e) => setForm((s) => ({ ...s, is_active: e.target.value === "yes" }))}>
+                <MenuItem value="yes">Yes</MenuItem>
+                <MenuItem value="no">No</MenuItem>
               </Select>
             </FormControl>
-            <Typography variant="caption" className="muted" sx={{ display: "block" }}>
-              Plugin Active/Inactive on cards uses recent agent data (separate from web access).
-            </Typography>
           </Stack>
         </DialogContent>
         <DialogActions>
