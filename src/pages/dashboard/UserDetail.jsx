@@ -92,6 +92,55 @@ function safeText(v) {
   return s.trim() ? s : "—";
 }
 
+/** e.g. "main_screen|1920x1080" */
+function parseCaptureScreen(raw) {
+  const s = String(raw ?? "").trim();
+  if (!s) return { screen: "", resolution: "", empty: true };
+  const i = s.indexOf("|");
+  if (i === -1) return { screen: s, resolution: "", empty: false };
+  return {
+    screen: s.slice(0, i).trim() || "—",
+    resolution: s.slice(i + 1).trim(),
+    empty: false,
+  };
+}
+
+function formatResolutionPretty(res) {
+  if (!res) return "";
+  return String(res).replace(/(\d+)\s*[xX]\s*(\d+)/, "$1 × $2");
+}
+
+function CaptureScreenDisplay({ value, dense = false }) {
+  const { screen, resolution, empty } = parseCaptureScreen(value);
+  if (empty) {
+    return (
+      <Typography variant="body2" className="muted">
+        —
+      </Typography>
+    );
+  }
+  const inner = (
+    <Stack direction={dense ? "row" : "column"} spacing={dense ? 0.75 : 0.5} alignItems={dense ? "center" : "flex-start"} flexWrap="wrap" useFlexGap>
+      <Chip
+        size="small"
+        variant="outlined"
+        label={screen}
+        sx={{ fontWeight: 800, maxWidth: "100%", "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis" } }}
+      />
+      {resolution ? (
+        <Typography
+          variant="caption"
+          component="span"
+          sx={{ color: "var(--muted)", fontFamily: "ui-monospace, monospace", fontWeight: 600 }}
+        >
+          {formatResolutionPretty(resolution)}
+        </Typography>
+      ) : null}
+    </Stack>
+  );
+  return inner;
+}
+
 function fmtDate(ts) {
   if (!ts) return "—";
   try {
@@ -196,7 +245,7 @@ async function openScreenshotSas(sid) {
 }
 
 function downloadLogsCSV(rows) {
-  const header = ["Date", "Time", "application", "window_title", "category", "operation", "details", "screenshot_id"];
+  const header = ["Date", "Time", "application", "window_title", "category", "operation", "details", "capture_screen", "screenshot_id"];
   const lines = [
     header.join(","),
     ...rows.map((r) =>
@@ -208,6 +257,7 @@ function downloadLogsCSV(rows) {
         safeText(r.category),
         safeText(r.operation),
         safeText(r.details || r.detail),
+        safeText(r.capture_screen || ""),
         safeText(logScreenshotId(r) || ""),
       ]
         .map((v) => `"${String(v).replace(/"/g, '""')}"`)
@@ -359,6 +409,7 @@ function LogsTable({ rows = [], totalRows = 0, hasMore = false, onEnsureAllRows,
         safeText(r.category),
         safeText(r.operation),
         safeText(r.details || r.detail),
+        safeText(r.capture_screen || ""),
         safeText(sid || ""),
       ]
         .join(" ")
@@ -380,6 +431,7 @@ function LogsTable({ rows = [], totalRows = 0, hasMore = false, onEnsureAllRows,
         category: safeText(a.category).localeCompare(safeText(b.category)),
         operation: safeText(a.operation).localeCompare(safeText(b.operation)),
         details: safeText(a.details || a.detail).localeCompare(safeText(b.details || b.detail)),
+        capture_screen: safeText(a.capture_screen).localeCompare(safeText(b.capture_screen)),
         screenshot: sidA - sidB,
         ts: String(a.ts || "").localeCompare(String(b.ts || "")),
       };
@@ -457,7 +509,7 @@ function LogsTable({ rows = [], totalRows = 0, hasMore = false, onEnsureAllRows,
         <TextField
           size="small"
           label="Search"
-          placeholder="App, title, details, screenshot id..."
+          placeholder="App, title, details, capture, screenshot id..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           sx={{ minWidth: { xs: "100%", sm: 280 }, flex: 1 }}
@@ -684,7 +736,7 @@ function LogsTable({ rows = [], totalRows = 0, hasMore = false, onEnsureAllRows,
           stickyHeader
           size="small"
           sx={{
-            minWidth: 1320,
+            minWidth: 1460,
             tableLayout: "fixed",
             "& .MuiTableCell-root": logCellWrap,
             "& .MuiTableCell-head": {
@@ -703,10 +755,11 @@ function LogsTable({ rows = [], totalRows = 0, hasMore = false, onEnsureAllRows,
             <col style={{ width: 108 }} />
             <col style={{ width: 88 }} />
             <col style={{ width: 150 }} />
-            <col style={{ width: 260 }} />
-            <col style={{ width: 120 }} />
-            <col style={{ width: 120 }} />
-            <col style={{ width: "auto", minWidth: 280 }} />
+            <col style={{ width: 240 }} />
+            <col style={{ width: 110 }} />
+            <col style={{ width: 110 }} />
+            <col style={{ width: "auto", minWidth: 220 }} />
+            <col style={{ width: 150 }} />
             <col style={{ width: 96 }} />
           </colgroup>
           <TableHead>
@@ -718,13 +771,14 @@ function LogsTable({ rows = [], totalRows = 0, hasMore = false, onEnsureAllRows,
               <SortHead id="category" label="Category" />
               <SortHead id="operation" label="Operation" />
               <SortHead id="details" label="Details" />
+              <SortHead id="capture_screen" label="Capture" />
               <SortHead id="screenshot" label="Screenshot" align="center" />
             </TableRow>
           </TableHead>
           <TableBody>
             {visibleRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8}>
+                <TableCell colSpan={9}>
                   <Typography color="text.secondary">No rows match current filters.</Typography>
                 </TableCell>
               </TableRow>
@@ -740,6 +794,9 @@ function LogsTable({ rows = [], totalRows = 0, hasMore = false, onEnsureAllRows,
                     <TableCell>{safeText(r.category)}</TableCell>
                     <TableCell>{safeText(r.operation)}</TableCell>
                     <TableCell>{safeText(r.details || r.detail)}</TableCell>
+                    <TableCell>
+                      <CaptureScreenDisplay value={r.capture_screen} />
+                    </TableCell>
                     <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
                       {sid ? (
                         <Tooltip title="View screenshot (opens new tab)">
@@ -843,6 +900,13 @@ function ScreenshotCard({ row }) {
         {row.operation ? ` • ${safeText(row.operation)}` : ""}
       </Typography>
 
+      <Box sx={{ mt: 1 }}>
+        <Typography variant="caption" sx={{ color: "var(--muted)", fontWeight: 700, display: "block", mb: 0.5 }}>
+          Capture
+        </Typography>
+        <CaptureScreenDisplay value={row.capture_screen} dense />
+      </Box>
+
       <Stack direction="row" spacing={1} sx={{ mt: 1 }} alignItems="center" justifyContent="flex-end">
         {sid ? (
           <Button
@@ -907,7 +971,7 @@ function ScreenshotList({ rows = [] }) {
           stickyHeader
           size="small"
           sx={{
-            minWidth: 1040,
+            minWidth: 1180,
             tableLayout: "fixed",
             "& .MuiTableCell-root": logCellWrap,
             "& .MuiTableCell-head": {
@@ -927,7 +991,8 @@ function ScreenshotList({ rows = [] }) {
             <col style={{ width: 160 }} />
             <col style={{ width: 240 }} />
             <col style={{ width: 140 }} />
-            <col style={{ width: "auto", minWidth: 260 }} />
+            <col style={{ width: 150 }} />
+            <col style={{ width: "auto", minWidth: 280 }} />
           </colgroup>
           <TableHead>
             <TableRow>
@@ -936,13 +1001,14 @@ function ScreenshotList({ rows = [] }) {
               <TableCell>Application</TableCell>
               <TableCell>Window</TableCell>
               <TableCell>Operation</TableCell>
+              <TableCell>Capture</TableCell>
               <TableCell>Blob / view</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6}>
+                <TableCell colSpan={7}>
                   <Typography color="text.secondary">No screenshots for this range.</Typography>
                 </TableCell>
               </TableRow>
@@ -954,6 +1020,9 @@ function ScreenshotList({ rows = [] }) {
                   <TableCell>{safeText(r.application)}</TableCell>
                   <TableCell>{safeText(r.window_title)}</TableCell>
                   <TableCell>{safeText(r.operation || r.label)}</TableCell>
+                  <TableCell>
+                    <CaptureScreenDisplay value={r.capture_screen} />
+                  </TableCell>
                   <TableCell sx={{ wordBreak: "break-all" }}>
                     <Stack spacing={0.75}>
                       <Typography variant="caption" sx={{ color: "var(--muted)", display: "block" }}>
@@ -1058,6 +1127,7 @@ function ScreenshotsSection({ rows = [], totalRows = 0, hasMore = false, onEnsur
         app,
         safeText(r.window_title),
         op,
+        safeText(r.capture_screen || ""),
         safeText(r.screenshot_url),
         safeText(r.file_path),
         safeText(sid || ""),
@@ -1076,6 +1146,7 @@ function ScreenshotsSection({ rows = [], totalRows = 0, hasMore = false, onEnsur
         application: safeText(a.application).localeCompare(safeText(b.application)),
         window: safeText(a.window_title).localeCompare(safeText(b.window_title)),
         operation: safeText(a.operation || a.label).localeCompare(safeText(b.operation || b.label)),
+        capture_screen: safeText(a.capture_screen).localeCompare(safeText(b.capture_screen)),
         hasId: (screenshotLookupKey(a) ? 1 : 0) - (screenshotLookupKey(b) ? 1 : 0),
       };
       const cmp = map[sortBy] ?? map.ts;
@@ -1110,7 +1181,7 @@ function ScreenshotsSection({ rows = [], totalRows = 0, hasMore = false, onEnsur
         <TextField
           size="small"
           label="Search screenshots"
-          placeholder="Time, app, title, path, id..."
+          placeholder="Time, app, title, capture, path, id..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           sx={{ minWidth: { xs: "100%", sm: 280 }, flex: 1 }}
@@ -1141,6 +1212,7 @@ function ScreenshotsSection({ rows = [], totalRows = 0, hasMore = false, onEnsur
           <MenuItem value="application">Application</MenuItem>
           <MenuItem value="window">Window</MenuItem>
           <MenuItem value="operation">Operation</MenuItem>
+          <MenuItem value="capture_screen">Capture</MenuItem>
           <MenuItem value="hasId">Has id</MenuItem>
         </TextField>
         <TextField
