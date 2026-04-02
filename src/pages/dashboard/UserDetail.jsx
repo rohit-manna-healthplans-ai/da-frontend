@@ -45,6 +45,7 @@ import { useUserSelection } from "../../app/providers/UserSelectionProvider";
 import { useAuth } from "../../app/providers/AuthProvider";
 import { getUserApi } from "../../features/users/users.api";
 import { getLogs, getScreenshots, getScreenshotSasUrl } from "../../services/data.api";
+import { isAgentPluginOnline } from "../../utils/userPresence";
 
 /**
  * UserDetail — logs + screenshots.
@@ -1665,10 +1666,29 @@ export default function UserDetail({ selfMode = false }) {
                   <Chip size="small" variant="outlined" label={`Department: ${user?.department || "—"}`} />
                   <Chip size="small" variant="outlined" label={`Role: ${user?.role_key || "—"}`} />
                   <Chip size="small" variant="outlined" label={`MAC: ${user?.user_mac_id || user?._id || "—"}`} />
-                  <Chip size="small" variant="outlined" label={user?.is_active ? "Active" : "Inactive"} />
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    color={isAgentPluginOnline(user?.agent_last_seen_at) ? "success" : "warning"}
+                    label={isAgentPluginOnline(user?.agent_last_seen_at) ? "Plugin: Active" : "Plugin: Inactive"}
+                  />
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    color={user?.is_active !== false ? "success" : "warning"}
+                    label={user?.is_active !== false ? "Dashboard: allowed" : "Dashboard: blocked"}
+                  />
                 </>
               ) : (
-                <Chip size="small" variant="outlined" label={`Department: ${user?.department || me?.department || "—"}`} />
+                <>
+                  <Chip size="small" variant="outlined" label={`Department: ${user?.department || me?.department || "—"}`} />
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    color={isAgentPluginOnline(user?.agent_last_seen_at) ? "success" : "warning"}
+                    label={isAgentPluginOnline(user?.agent_last_seen_at) ? "Plugin: Active" : "Plugin: Inactive"}
+                  />
+                </>
               )}
             </Stack>
 

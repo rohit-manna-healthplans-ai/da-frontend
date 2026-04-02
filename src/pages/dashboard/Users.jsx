@@ -36,6 +36,7 @@ import PageHeader from "../../components/ui/PageHeader";
 import { listUsersApi, createUserApi, updateUserApi } from "../../features/users/users.api";
 import { listDepartmentsApi, createDepartmentApi } from "../../features/departments/departments.api";
 import { normalizeDepartmentList } from "../../utils/departments.jsx";
+import { isAgentPluginOnline } from "../../utils/userPresence";
 
 const ROLE_C_SUITE = "C_SUITE";
 const ROLE_DEPT_HEAD = "DEPARTMENT_HEAD";
@@ -74,6 +75,7 @@ function initials(nameOrEmail) {
 function UserCard({ u, onOpen }) {
   const title = u.full_name || u.company_username_norm || u.company_username || "User";
   const sub = u.company_username_norm || u.company_username || "—";
+  const pluginOn = isAgentPluginOnline(u.agent_last_seen_at);
 
   return (
     <Paper
@@ -110,17 +112,24 @@ function UserCard({ u, onOpen }) {
               label={roleLabel(u.role_key)}
               sx={String(u.role_key).toUpperCase() === ROLE_C_SUITE ? undefined : chipSx}
             />
-            <Chip
-              size="small"
-              color={u.is_active ? "success" : "warning"}
-              variant="outlined"
-              label={u.is_active ? "Active" : "Inactive"}
-              sx={
-                u.is_active
-                  ? { "& .MuiChip-label": { fontWeight: 600 } }
-                  : { color: "var(--text)", borderColor: "var(--border-2)", "& .MuiChip-label": { fontWeight: 700 } }
-              }
-            />
+            <Tooltip title="Plugin / agent: recent activity (data from device)">
+              <Chip
+                size="small"
+                color={pluginOn ? "success" : "warning"}
+                variant="outlined"
+                label={pluginOn ? "Active" : "Inactive"}
+                sx={
+                  pluginOn
+                    ? { "& .MuiChip-label": { fontWeight: 600 } }
+                    : { color: "var(--text)", borderColor: "var(--border-2)", "& .MuiChip-label": { fontWeight: 700 } }
+                }
+              />
+            </Tooltip>
+            {u.is_active === false ? (
+              <Tooltip title="Admin: web dashboard login is disabled for this user">
+                <Chip size="small" variant="outlined" color="warning" label="Dashboard off" sx={{ "& .MuiChip-label": { fontWeight: 700 } }} />
+              </Tooltip>
+            ) : null}
           </Stack>
         </Box>
 
@@ -135,6 +144,8 @@ function UserCard({ u, onOpen }) {
 }
 
 function UserRow({ u, onOpen }) {
+  const pluginOn = isAgentPluginOnline(u.agent_last_seen_at);
+
   return (
     <Paper
       className="glass glass-hover"
@@ -168,17 +179,22 @@ function UserRow({ u, onOpen }) {
           label={roleLabel(u.role_key)}
           sx={String(u.role_key).toUpperCase() === ROLE_C_SUITE ? undefined : chipSx}
         />
-        <Chip
-          size="small"
-          color={u.is_active ? "success" : "warning"}
-          variant="outlined"
-          label={u.is_active ? "Active" : "Inactive"}
-          sx={
-            u.is_active
-              ? { "& .MuiChip-label": { fontWeight: 600 } }
-              : { color: "var(--text)", borderColor: "var(--border-2)", "& .MuiChip-label": { fontWeight: 700 } }
-          }
-        />
+        <Tooltip title="Plugin: recent agent activity">
+          <Chip
+            size="small"
+            color={pluginOn ? "success" : "warning"}
+            variant="outlined"
+            label={pluginOn ? "Active" : "Inactive"}
+            sx={
+              pluginOn
+                ? { "& .MuiChip-label": { fontWeight: 600 } }
+                : { color: "var(--text)", borderColor: "var(--border-2)", "& .MuiChip-label": { fontWeight: 700 } }
+            }
+          />
+        </Tooltip>
+        {u.is_active === false ? (
+          <Chip size="small" variant="outlined" color="warning" label="Dashboard off" sx={{ "& .MuiChip-label": { fontWeight: 700 } }} />
+        ) : null}
       </Stack>
     </Paper>
   );
@@ -205,6 +221,7 @@ export default function Users() {
   const [deptFilter, setDeptFilter] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [pluginFilter, setPluginFilter] = useState("all");
   const [sort, setSort] = useState("name"); // name | created
 
   // Admin dialogs (kept)
@@ -279,6 +296,11 @@ export default function Users() {
     } else if (statusFilter === "inactive") {
       rows = rows.filter((u) => !Boolean(u.is_active));
     }
+    if (pluginFilter === "online") {
+      rows = rows.filter((u) => isAgentPluginOnline(u.agent_last_seen_at));
+    } else if (pluginFilter === "offline") {
+      rows = rows.filter((u) => !isAgentPluginOnline(u.agent_last_seen_at));
+    }
 
     // search
     const s = String(q || "").trim().toLowerCase();
@@ -297,15 +319,16 @@ export default function Users() {
     }
 
     return rows;
-  }, [users, deptFilter, roleFilter, statusFilter, q, sort, me, role]);
+  }, [users, deptFilter, roleFilter, statusFilter, pluginFilter, q, sort, me, role]);
 
   const activeFilterCount = useMemo(() => {
     let n = 0;
     if (deptFilter) n += 1;
     if (roleFilter !== "all") n += 1;
     if (statusFilter !== "all") n += 1;
+    if (pluginFilter !== "all") n += 1;
     return n;
-  }, [deptFilter, roleFilter, statusFilter]);
+  }, [deptFilter, roleFilter, statusFilter, pluginFilter]);
 
   function openUser(u) {
   const email = u.company_username_norm || u.company_username;
@@ -576,11 +599,20 @@ export default function Users() {
               </FormControl>
 
               <FormControl size="small" fullWidth>
-                <InputLabel>Status</InputLabel>
-                <Select value={statusFilter} label="Status" onChange={(e) => setStatusFilter(e.target.value)}>
+                <InputLabel>Dashboard access (admin)</InputLabel>
+                <Select value={statusFilter} label="Dashboard access (admin)" onChange={(e) => setStatusFilter(e.target.value)}>
                   <MenuItem value="all">All</MenuItem>
-                  <MenuItem value="active">Active</MenuItem>
-                  <MenuItem value="inactive">Inactive</MenuItem>
+                  <MenuItem value="active">Allowed (can log in)</MenuItem>
+                  <MenuItem value="inactive">Blocked (cannot log in)</MenuItem>
+                </Select>
+              </FormControl>
+
+              <FormControl size="small" fullWidth>
+                <InputLabel>Plugin (agent)</InputLabel>
+                <Select value={pluginFilter} label="Plugin (agent)" onChange={(e) => setPluginFilter(e.target.value)}>
+                  <MenuItem value="all">All</MenuItem>
+                  <MenuItem value="online">Active (recent data)</MenuItem>
+                  <MenuItem value="offline">Inactive (no recent data)</MenuItem>
                 </Select>
               </FormControl>
 
@@ -598,6 +630,7 @@ export default function Users() {
                   setDeptFilter("");
                   setRoleFilter("all");
                   setStatusFilter("all");
+                  setPluginFilter("all");
                   setSort("name");
                 }}
               >
@@ -684,6 +717,17 @@ export default function Users() {
                 <MenuItem value={ROLE_C_SUITE}>C-Suite</MenuItem>
               </Select>
             </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>Dashboard access (admin)</InputLabel>
+              <Select
+                value={form.is_active ? "yes" : "no"}
+                label="Dashboard access (admin)"
+                onChange={(e) => setForm((s) => ({ ...s, is_active: e.target.value === "yes" }))}
+              >
+                <MenuItem value="yes">Allowed — user can log in to web dashboard</MenuItem>
+                <MenuItem value="no">Blocked — user cannot log in</MenuItem>
+              </Select>
+            </FormControl>
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -725,11 +769,15 @@ export default function Users() {
                 <MenuItem value={ROLE_C_SUITE}>C-Suite</MenuItem>
               </Select>
             </FormControl>
-            <FormControl>
-              <InputLabel>Active</InputLabel>
-              <Select value={form.is_active ? "yes" : "no"} label="Active" onChange={(e) => setForm((s) => ({ ...s, is_active: e.target.value === "yes" }))}>
-                <MenuItem value="yes">Yes</MenuItem>
-                <MenuItem value="no">No</MenuItem>
+            <FormControl fullWidth>
+              <InputLabel>Dashboard access (admin)</InputLabel>
+              <Select
+                value={form.is_active ? "yes" : "no"}
+                label="Dashboard access (admin)"
+                onChange={(e) => setForm((s) => ({ ...s, is_active: e.target.value === "yes" }))}
+              >
+                <MenuItem value="yes">Allowed — user can log in to web dashboard</MenuItem>
+                <MenuItem value="no">Blocked — user cannot log in</MenuItem>
               </Select>
             </FormControl>
           </Stack>
