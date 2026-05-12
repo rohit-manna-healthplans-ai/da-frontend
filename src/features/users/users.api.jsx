@@ -11,6 +11,11 @@ export async function listUsersApi(params = {}) {
   return unwrap(res) || [];
 }
 
+export async function getMeUserApi() {
+  const res = await http.get("/api/users/me");
+  return unwrap(res);
+}
+
 export async function getUserApi(companyUsername) {
   const res = await http.get(`/api/users/${encodeURIComponent(companyUsername)}`);
   return unwrap(res);

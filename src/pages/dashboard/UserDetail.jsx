@@ -43,7 +43,7 @@ import PageHeader from "../../components/ui/PageHeader";
 
 import { useUserSelection } from "../../app/providers/UserSelectionProvider";
 import { useAuth } from "../../app/providers/AuthProvider";
-import { getUserApi } from "../../features/users/users.api";
+import { getMeUserApi, getUserApi } from "../../features/users/users.api";
 import { getLogs, getScreenshots, getScreenshotSasUrl } from "../../services/data.api";
 import { isAgentPluginOnline } from "../../utils/userPresence";
 
@@ -221,6 +221,12 @@ function inDateRange(ymd, from, to) {
   return ymd <= to;
 }
 
+function logLogId(r) {
+  const v = r?.log_id ?? r?.logId;
+  if (v === null || v === undefined || v === "") return null;
+  return String(v);
+}
+
 function logScreenshotId(r) {
   const v = r?.screenshot_id ?? r?.screenshotId;
   if (v === null || v === undefined || v === "") return null;
@@ -245,13 +251,14 @@ async function openScreenshotSas(sid) {
 }
 
 function downloadLogsCSV(rows) {
-  const header = ["Date", "Time", "application", "window_title", "category", "operation", "details", "capture_screen", "screenshot_id"];
+  const header = ["Date", "Time", "log_id", "application", "window_title", "category", "operation", "details", "capture_screen", "screenshot_id"];
   const lines = [
     header.join(","),
     ...rows.map((r) =>
       [
         fmtDate(r.ts),
         fmtTime(r.ts),
+        safeText(logLogId(r) || ""),
         safeText(r.application),
         safeText(r.window_title),
         safeText(r.category),
@@ -390,6 +397,7 @@ function LogsTable({ rows = [], totalRows = 0, hasMore = false, onEnsureAllRows,
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
+      const logId = logLogId(r);
       const sid = logScreenshotId(r);
       const d = dateFromTs(r.ts);
       const t = hhmmFromTs(r.ts);
@@ -404,6 +412,7 @@ function LogsTable({ rows = [], totalRows = 0, hasMore = false, onEnsureAllRows,
       const blob = [
         fmtDate(r.ts),
         fmtTime(r.ts),
+        safeText(logId || ""),
         safeText(r.application),
         safeText(r.window_title),
         safeText(r.category),
@@ -432,6 +441,8 @@ function LogsTable({ rows = [], totalRows = 0, hasMore = false, onEnsureAllRows,
         operation: safeText(a.operation).localeCompare(safeText(b.operation)),
         details: safeText(a.details || a.detail).localeCompare(safeText(b.details || b.detail)),
         capture_screen: safeText(a.capture_screen).localeCompare(safeText(b.capture_screen)),
+        log_id: safeText(logLogId(a)).localeCompare(safeText(logLogId(b))),
+        screenshot_id: safeText(logScreenshotId(a)).localeCompare(safeText(logScreenshotId(b))),
         screenshot: sidA - sidB,
         ts: String(a.ts || "").localeCompare(String(b.ts || "")),
       };
@@ -509,7 +520,7 @@ function LogsTable({ rows = [], totalRows = 0, hasMore = false, onEnsureAllRows,
         <TextField
           size="small"
           label="Search"
-          placeholder="App, title, details, capture, screenshot id..."
+          placeholder="App, title, log id, details, capture, screenshot id..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           sx={{ minWidth: { xs: "100%", sm: 280 }, flex: 1 }}
@@ -736,7 +747,7 @@ function LogsTable({ rows = [], totalRows = 0, hasMore = false, onEnsureAllRows,
           stickyHeader
           size="small"
           sx={{
-            minWidth: 1460,
+            minWidth: 1680,
             tableLayout: "fixed",
             "& .MuiTableCell-root": logCellWrap,
             "& .MuiTableCell-head": {
@@ -760,6 +771,8 @@ function LogsTable({ rows = [], totalRows = 0, hasMore = false, onEnsureAllRows,
             <col style={{ width: 110 }} />
             <col style={{ width: "auto", minWidth: 220 }} />
             <col style={{ width: 150 }} />
+            <col style={{ width: 180 }} />
+            <col style={{ width: 180 }} />
             <col style={{ width: 96 }} />
           </colgroup>
           <TableHead>
@@ -772,21 +785,24 @@ function LogsTable({ rows = [], totalRows = 0, hasMore = false, onEnsureAllRows,
               <SortHead id="operation" label="Operation" />
               <SortHead id="details" label="Details" />
               <SortHead id="capture_screen" label="Capture" />
-              <SortHead id="screenshot" label="Screenshot" align="center" />
+              <SortHead id="log_id" label="Log ID" />
+              <SortHead id="screenshot_id" label="Screenshot ID" />
+              <SortHead id="screenshot" label="View" align="center" />
             </TableRow>
           </TableHead>
           <TableBody>
             {visibleRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9}>
+                <TableCell colSpan={11}>
                   <Typography color="text.secondary">No rows match current filters.</Typography>
                 </TableCell>
               </TableRow>
             ) : (
               visibleRows.map((r, idx) => {
+                const logId = logLogId(r);
                 const sid = logScreenshotId(r);
                 return (
-                  <TableRow key={`${r.ts || ""}_${idx}`} hover>
+                  <TableRow key={`${logId || r.ts || ""}_${idx}`} hover>
                     <TableCell sx={{ whiteSpace: "nowrap" }}>{fmtDate(r.ts)}</TableCell>
                     <TableCell sx={{ whiteSpace: "nowrap" }}>{fmtTime(r.ts)}</TableCell>
                     <TableCell>{safeText(r.application)}</TableCell>
@@ -797,6 +813,8 @@ function LogsTable({ rows = [], totalRows = 0, hasMore = false, onEnsureAllRows,
                     <TableCell>
                       <CaptureScreenDisplay value={r.capture_screen} />
                     </TableCell>
+                    <TableCell sx={{ wordBreak: "break-all" }}>{logId || "—"}</TableCell>
+                    <TableCell sx={{ wordBreak: "break-all" }}>{sid || "—"}</TableCell>
                     <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
                       {sid ? (
                         <Tooltip title="View screenshot (opens new tab)">
@@ -971,7 +989,7 @@ function ScreenshotList({ rows = [] }) {
           stickyHeader
           size="small"
           sx={{
-            minWidth: 1180,
+            minWidth: 1380,
             tableLayout: "fixed",
             "& .MuiTableCell-root": logCellWrap,
             "& .MuiTableCell-head": {
@@ -992,6 +1010,7 @@ function ScreenshotList({ rows = [] }) {
             <col style={{ width: 240 }} />
             <col style={{ width: 140 }} />
             <col style={{ width: 150 }} />
+            <col style={{ width: 180 }} />
             <col style={{ width: "auto", minWidth: 280 }} />
           </colgroup>
           <TableHead>
@@ -1002,19 +1021,22 @@ function ScreenshotList({ rows = [] }) {
               <TableCell>Window</TableCell>
               <TableCell>Operation</TableCell>
               <TableCell>Capture</TableCell>
+              <TableCell>Screenshot ID</TableCell>
               <TableCell>Blob / view</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7}>
+                <TableCell colSpan={8}>
                   <Typography color="text.secondary">No screenshots for this range.</Typography>
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((r, idx) => (
-                <TableRow key={`${r.ts || ""}_${idx}`} hover>
+              rows.map((r, idx) => {
+                const sid = screenshotLookupKey(r);
+                return (
+                <TableRow key={`${sid || r.ts || ""}_${idx}`} hover>
                   <TableCell sx={{ whiteSpace: "nowrap" }}>{fmtDate(r.ts)}</TableCell>
                   <TableCell sx={{ whiteSpace: "nowrap" }}>{fmtTime(r.ts)}</TableCell>
                   <TableCell>{safeText(r.application)}</TableCell>
@@ -1023,6 +1045,7 @@ function ScreenshotList({ rows = [] }) {
                   <TableCell>
                     <CaptureScreenDisplay value={r.capture_screen} />
                   </TableCell>
+                  <TableCell sx={{ wordBreak: "break-all" }}>{sid || "—"}</TableCell>
                   <TableCell sx={{ wordBreak: "break-all" }}>
                     <Stack spacing={0.75}>
                       <Typography variant="caption" sx={{ color: "var(--muted)", display: "block" }}>
@@ -1032,7 +1055,7 @@ function ScreenshotList({ rows = [] }) {
                             ? safeText(r.file_path)
                             : "—"}
                       </Typography>
-                      {screenshotLookupKey(r) ? (
+                      {sid ? (
                         <Stack direction="row" alignItems="center" spacing={0.5} flexWrap="wrap" useFlexGap>
                           <Tooltip title="Open image with fresh SAS URL (~1h)">
                             <IconButton
@@ -1042,7 +1065,7 @@ function ScreenshotList({ rows = [] }) {
                               onClick={async (e) => {
                                 e.stopPropagation();
                                 try {
-                                  await openScreenshotSas(screenshotLookupKey(r));
+                                  await openScreenshotSas(sid);
                                 } catch (err) {
                                   window.alert(err?.response?.data?.error || err?.message || "Failed");
                                 }
@@ -1051,9 +1074,6 @@ function ScreenshotList({ rows = [] }) {
                               <VisibilityOutlinedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          <Typography variant="caption" className="muted">
-                            id: {screenshotLookupKey(r)}
-                          </Typography>
                         </Stack>
                       ) : (
                         <Typography variant="caption" color="text.secondary">
@@ -1063,7 +1083,8 @@ function ScreenshotList({ rows = [] }) {
                     </Stack>
                   </TableCell>
                 </TableRow>
-              ))
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -1147,6 +1168,7 @@ function ScreenshotsSection({ rows = [], totalRows = 0, hasMore = false, onEnsur
         window: safeText(a.window_title).localeCompare(safeText(b.window_title)),
         operation: safeText(a.operation || a.label).localeCompare(safeText(b.operation || b.label)),
         capture_screen: safeText(a.capture_screen).localeCompare(safeText(b.capture_screen)),
+        screenshot_id: safeText(screenshotLookupKey(a)).localeCompare(safeText(screenshotLookupKey(b))),
         hasId: (screenshotLookupKey(a) ? 1 : 0) - (screenshotLookupKey(b) ? 1 : 0),
       };
       const cmp = map[sortBy] ?? map.ts;
@@ -1213,6 +1235,7 @@ function ScreenshotsSection({ rows = [], totalRows = 0, hasMore = false, onEnsur
           <MenuItem value="window">Window</MenuItem>
           <MenuItem value="operation">Operation</MenuItem>
           <MenuItem value="capture_screen">Capture</MenuItem>
+          <MenuItem value="screenshot_id">Screenshot ID</MenuItem>
           <MenuItem value="hasId">Has id</MenuItem>
         </TextField>
         <TextField
@@ -1477,7 +1500,7 @@ export default function UserDetail({ selfMode = false }) {
         }
 
         const routeKey = routeEmailKey;
-        const u = await getUserApi(routeKey);
+        const u = selfMode ? await getMeUserApi() : await getUserApi(routeKey);
         if (!mounted) return;
 
         if (myRole === ROLE_DEPT_HEAD && me?.department && u?.department) {
